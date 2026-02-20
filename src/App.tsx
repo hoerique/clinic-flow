@@ -11,6 +11,7 @@ import Financeiro from "./pages/Financeiro";
 import Automacoes from "./pages/Automacoes";
 import Usuarios from "./pages/Usuarios";
 import Relatorios from "./pages/Relatorios";
+import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/automacoes" element={<Automacoes />} />
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/configuracoes" element={<Configuracoes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
