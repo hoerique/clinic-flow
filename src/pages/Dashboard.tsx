@@ -1,12 +1,13 @@
 import { AppLayout } from "@/components/AppLayout";
 import {
   Users, Calendar, TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight,
-  Clock, CheckCircle, XCircle, AlertCircle, Activity, Plus,
+  Clock, CheckCircle, XCircle, AlertCircle, Activity, Plus, Loader2
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { usePacientes, useAgendamentos } from "@/hooks/useSupabase";
 
 const revenueData = [
   { mes: "Ago", receita: 42000, meta: 50000 },
@@ -25,15 +26,6 @@ const procedimentosData = [
   { name: "Outros", value: 9, color: "#4ADE80" },
 ];
 
-const agendaHoje = [
-  { hora: "08:00", paciente: "Maria Silva", proc: "Limpeza", status: "realizado" },
-  { hora: "09:00", paciente: "João Santos", proc: "Ortodontia", status: "realizado" },
-  { hora: "10:30", paciente: "Ana Costa", proc: "Clareamento", status: "confirmado" },
-  { hora: "11:00", paciente: "Pedro Oliveira", proc: "Consulta", status: "agendado" },
-  { hora: "14:00", paciente: "Carla Lima", proc: "Implante", status: "faltou" },
-  { hora: "15:30", paciente: "Lucas Mendes", proc: "Limpeza", status: "agendado" },
-];
-
 const statusColors: Record<string, string> = {
   realizado: "text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)]",
   confirmado: "text-[hsl(var(--teal))] bg-[hsl(var(--teal)/0.1)]",
@@ -49,57 +41,6 @@ const statusLabels: Record<string, string> = {
   faltou: "Faltou",
   cancelado: "Cancelado",
 };
-
-const kpis = [
-  {
-    label: "Novos Pacientes",
-    value: "47",
-    sub: "+12% vs mês anterior",
-    trend: "up",
-    icon: Users,
-    color: "teal",
-  },
-  {
-    label: "Receita Mensal",
-    value: "R$ 71.4k",
-    sub: "+15% vs mês anterior",
-    trend: "up",
-    icon: DollarSign,
-    color: "success",
-  },
-  {
-    label: "Taxa de Comparecimento",
-    value: "84%",
-    sub: "-3% vs mês anterior",
-    trend: "down",
-    icon: CheckCircle,
-    color: "warning",
-  },
-  {
-    label: "Ticket Médio",
-    value: "R$ 380",
-    sub: "+8% vs mês anterior",
-    trend: "up",
-    icon: TrendingUp,
-    color: "info",
-  },
-  {
-    label: "Orçamentos Enviados",
-    value: "23",
-    sub: "Taxa conversão: 65%",
-    trend: "up",
-    icon: Activity,
-    color: "teal",
-  },
-  {
-    label: "Agenda Hoje",
-    value: "18",
-    sub: "4 confirmados, 2 faltaram",
-    trend: "neutral",
-    icon: Calendar,
-    color: "info",
-  },
-];
 
 const colorMap: Record<string, string> = {
   teal: "hsl(var(--teal))",
@@ -128,6 +69,65 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Dashboard() {
+  const { data: pacientes = [], isLoading: loadingPacientes } = usePacientes();
+  const { data: agendamentos = [], isLoading: loadingAgendamentos } = useAgendamentos();
+
+  const totalPacientes = pacientes.length;
+  const agendamentosHoje = agendamentos.length; // Simplified for demo
+  const confirmados = agendamentos.filter((a: any) => a.status === 'confirmado').length;
+  const faltas = agendamentos.filter((a: any) => a.status === 'faltou').length;
+
+  const kpis = [
+    {
+      label: "Total Pacientes",
+      value: totalPacientes.toString(),
+      sub: "Base de dados atualizada",
+      trend: "up",
+      icon: Users,
+      color: "teal",
+    },
+    {
+      label: "Receita Mensal",
+      value: "R$ 71.4k",
+      sub: "+15% vs mês anterior",
+      trend: "up",
+      icon: DollarSign,
+      color: "success",
+    },
+    {
+      label: "Taxa de Comparecimento",
+      value: "84%",
+      sub: "-3% vs mês anterior",
+      trend: "down",
+      icon: CheckCircle,
+      color: "warning",
+    },
+    {
+      label: "Ticket Médio",
+      value: "R$ 380",
+      sub: "+8% vs mês anterior",
+      trend: "up",
+      icon: TrendingUp,
+      color: "info",
+    },
+    {
+      label: "Orçamentos Enviados",
+      value: "23",
+      sub: "Taxa conversão: 65%",
+      trend: "up",
+      icon: Activity,
+      color: "teal",
+    },
+    {
+      label: "Agenda Hoje",
+      value: agendamentosHoje.toString(),
+      sub: `${confirmados} confirmados, ${faltas} faltaram`,
+      trend: "neutral",
+      icon: Calendar,
+      color: "info",
+    },
+  ];
+
   return (
     <AppLayout
       title="Dashboard"
@@ -155,7 +155,11 @@ export default function Dashboard() {
                     <ArrowDownRight className="w-4 h-4 text-[hsl(var(--destructive))]" />
                   )}
                 </div>
-                <p className="text-xl font-bold text-foreground">{kpi.value}</p>
+                {(loadingPacientes || loadingAgendamentos) && (kpi.label === "Total Pacientes" || kpi.label === "Agenda Hoje") ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <p className="text-xl font-bold text-foreground">{kpi.value}</p>
+                )}
                 <p className="text-xs font-medium text-foreground/80 mt-0.5">{kpi.label}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{kpi.sub}</p>
               </div>
@@ -235,18 +239,30 @@ export default function Dashboard() {
               <button className="text-xs text-[hsl(var(--teal))] font-medium hover:underline">Ver completa →</button>
             </div>
             <div className="space-y-2">
-              {agendaHoje.map((apt, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--surface-2))] hover:bg-[hsl(var(--surface-3))] transition-colors">
-                  <span className="text-xs font-mono font-bold text-muted-foreground w-12 flex-shrink-0">{apt.hora}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{apt.paciente}</p>
-                    <p className="text-xs text-muted-foreground">{apt.proc}</p>
-                  </div>
-                  <span className={`status-badge ${statusColors[apt.status]}`}>
-                    {statusLabels[apt.status]}
-                  </span>
+              {loadingAgendamentos ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ))}
+              ) : agendamentos.length === 0 ? (
+                <p className="text-sm text-center py-10 text-muted-foreground">Nenhum agendamento para hoje.</p>
+              ) : (
+                agendamentos.slice(0, 6).map((apt: any, i: number) => {
+                  const aptDate = new Date(apt.data_hora);
+                  const aptHora = `${aptDate.getHours().toString().padStart(2, '0')}:${aptDate.getMinutes().toString().padStart(2, '0')}`;
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--surface-2))] hover:bg-[hsl(var(--surface-3))] transition-colors">
+                      <span className="text-xs font-mono font-bold text-muted-foreground w-12 flex-shrink-0">{aptHora}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{apt.pacientes?.nome || apt.paciente_nome}</p>
+                        <p className="text-xs text-muted-foreground">{apt.procedimento}</p>
+                      </div>
+                      <span className={`status-badge text-[9px] ${statusColors[apt.status] || statusColors.agendado}`}>
+                        {statusLabels[apt.status] || statusLabels.agendado}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -258,33 +274,26 @@ export default function Dashboard() {
                 <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.2)]">
                   <XCircle className="w-4 h-4 text-[hsl(var(--destructive))] mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-xs font-semibold text-foreground">3 faltas hoje</p>
+                    <p className="text-xs font-semibold text-foreground">{faltas} faltas registradas</p>
                     <p className="text-[10px] text-muted-foreground">Disparar recuperação automática</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.2)]">
                   <AlertCircle className="w-4 h-4 text-[hsl(var(--warning))] mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-xs font-semibold text-foreground">5 orçamentos pendentes</p>
-                    <p className="text-[10px] text-muted-foreground">Aguardando resposta há +7 dias</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[hsl(var(--teal)/0.1)] border border-[hsl(var(--teal)/0.2)]">
-                  <Clock className="w-4 h-4 text-[hsl(var(--teal))] mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">12 lembretes agendados</p>
-                    <p className="text-[10px] text-muted-foreground">WhatsApp para amanhã</p>
+                    <p className="text-xs font-semibold text-foreground">Acompanhamento pendente</p>
+                    <p className="text-[10px] text-muted-foreground">Pacientes aguardando retorno</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="stat-card rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Pacientes Inativos</h3>
-              <p className="text-2xl font-bold text-foreground">38</p>
-              <p className="text-xs text-muted-foreground">sem consulta há +60 dias</p>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Pacientes Totais</h3>
+              <p className="text-2xl font-bold text-foreground">{totalPacientes}</p>
+              <p className="text-xs text-muted-foreground">cadastrados no sistema</p>
               <button className="mt-3 w-full py-2 rounded-lg text-xs font-semibold gradient-primary text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity">
-                Iniciar Campanha de Reativação
+                Ver todos os pacientes
               </button>
             </div>
           </div>
@@ -293,3 +302,4 @@ export default function Dashboard() {
     </AppLayout>
   );
 }
+

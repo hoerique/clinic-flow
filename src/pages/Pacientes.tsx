@@ -1,6 +1,12 @@
 import { AppLayout } from "@/components/AppLayout";
-import { Search, Filter, Plus, MoreVertical, Phone, Mail, Tag, ChevronDown } from "lucide-react";
+import { Search, Filter, Plus, MoreVertical, Phone, Mail, Tag, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { usePacientes, useCreatePaciente } from "@/hooks/useSupabase";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 const statusFunil = [
   { key: "lead", label: "Lead", color: "hsl(var(--muted-foreground))" },
@@ -9,19 +15,6 @@ const statusFunil = [
   { key: "em_atendimento", label: "Em Atendimento", color: "hsl(var(--warning))" },
   { key: "pos_consulta", label: "Pós-consulta", color: "hsl(var(--success))" },
   { key: "inativo", label: "Inativo", color: "hsl(var(--destructive))" },
-];
-
-const tags = ["Ortodontia", "Implante", "Plano Saúde", "Particular", "Urgência", "VIP", "Inativo"];
-
-const pacientes = [
-  { id: 1, nome: "Maria Silva Santos", cpf: "123.456.789-00", telefone: "(11) 99876-5432", email: "maria@email.com", convenio: "Unimed", status: "confirmado", tags: ["Ortodontia", "VIP"], ultimaConsulta: "15/01/2026", valor: "R$ 1.800" },
-  { id: 2, nome: "João Carlos Oliveira", cpf: "987.654.321-00", telefone: "(11) 91234-5678", email: "joao@email.com", convenio: "Particular", status: "agendado", tags: ["Implante"], ultimaConsulta: "20/01/2026", valor: "R$ 4.500" },
-  { id: 3, nome: "Ana Beatriz Costa", cpf: "456.789.123-00", telefone: "(11) 98765-4321", email: "ana@email.com", convenio: "Amil", status: "lead", tags: ["Plano Saúde"], ultimaConsulta: "—", valor: "R$ 0" },
-  { id: 4, nome: "Pedro Henrique Mendes", cpf: "321.654.987-00", telefone: "(11) 97654-3210", email: "pedro@email.com", convenio: "Particular", status: "pos_consulta", tags: ["Ortodontia"], ultimaConsulta: "10/01/2026", valor: "R$ 2.200" },
-  { id: 5, nome: "Carla Fernanda Lima", cpf: "654.321.098-00", telefone: "(11) 96543-2109", email: "carla@email.com", convenio: "SulAmérica", status: "inativo", tags: ["Inativo"], ultimaConsulta: "05/10/2025", valor: "R$ 900" },
-  { id: 6, nome: "Lucas Eduardo Rocha", cpf: "789.012.345-00", telefone: "(11) 95432-1098", email: "lucas@email.com", convenio: "Particular", status: "em_atendimento", tags: ["Urgência", "Implante"], ultimaConsulta: "Hoje", valor: "R$ 6.000" },
-  { id: 7, nome: "Fernanda Alves Nunes", cpf: "012.345.678-00", telefone: "(11) 94321-0987", email: "fernanda@email.com", convenio: "Bradesco Saúde", status: "confirmado", tags: ["VIP"], ultimaConsulta: "18/01/2026", valor: "R$ 3.500" },
-  { id: 8, nome: "Ricardo Bento Carvalho", cpf: "345.678.901-00", telefone: "(11) 93210-9876", email: "ricardo@email.com", convenio: "Particular", status: "agendado", tags: ["Ortodontia", "Plano Saúde"], ultimaConsulta: "12/12/2025", valor: "R$ 1.200" },
 ];
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -36,35 +29,133 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
 export default function Pacientes() {
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newPaciente, setNewPaciente] = useState({
+    nome: "",
+    cpf: "",
+    telefone: "",
+    email: "",
+    convenio: "Particular",
+    status: "lead",
+    tags: [] as string[],
+  });
 
-  const filtered = pacientes.filter((p) => {
+  const { data: pacientes = [], isLoading } = usePacientes();
+  const createPaciente = useCreatePaciente();
+
+  const filtered = pacientes.filter((p: any) => {
     const matchSearch = p.nome.toLowerCase().includes(search.toLowerCase()) ||
-      p.cpf.includes(search) || p.telefone.includes(search);
+      (p.cpf && p.cpf.includes(search)) || (p.telefone && p.telefone.includes(search));
     const matchStatus = selectedStatus ? p.status === selectedStatus : true;
     return matchSearch && matchStatus;
   });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createPaciente.mutateAsync(newPaciente);
+      toast.success("Paciente cadastrado com sucesso!");
+      setIsDialogOpen(false);
+      setNewPaciente({
+        nome: "",
+        cpf: "",
+        telefone: "",
+        email: "",
+        convenio: "Particular",
+        status: "lead",
+        tags: [],
+      });
+    } catch (error) {
+      toast.error("Erro ao cadastrar paciente");
+    }
+  };
 
   return (
     <AppLayout
       title="Pacientes"
       subtitle={`${pacientes.length} pacientes cadastrados`}
       action={
-        <button className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-primary text-[hsl(var(--primary-foreground))] text-sm font-semibold hover:opacity-90 transition-opacity shadow-teal">
-          <Plus className="w-4 h-4" />
-          Novo Paciente
-        </button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2 gradient-primary text-[hsl(var(--primary-foreground))] hover:opacity-90 shadow-teal">
+              <Plus className="w-4 h-4" />
+              Novo Paciente
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px] bg-[hsl(var(--surface-1))] border-border">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">CADASTRAR NOVO PACIENTE</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreate} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome" className="text-muted-foreground">Nome Completo</Label>
+                <Input
+                  id="nome"
+                  required
+                  value={newPaciente.nome}
+                  onChange={(e) => setNewPaciente({ ...newPaciente, nome: e.target.value })}
+                  placeholder="Ex: Maria Silva"
+                  className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cpf" className="text-muted-foreground">CPF</Label>
+                  <Input
+                    id="cpf"
+                    value={newPaciente.cpf}
+                    onChange={(e) => setNewPaciente({ ...newPaciente, cpf: e.target.value })}
+                    placeholder="000.000.000-00"
+                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefone" className="text-muted-foreground">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    value={newPaciente.telefone}
+                    onChange={(e) => setNewPaciente({ ...newPaciente, telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-muted-foreground">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newPaciente.email}
+                  onChange={(e) => setNewPaciente({ ...newPaciente, email: e.target.value })}
+                  placeholder="email@exemplo.com"
+                  className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="submit"
+                  disabled={createPaciente.isPending}
+                  className="gradient-primary text-[hsl(var(--primary-foreground))] w-full"
+                >
+                  {createPaciente.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Salvar Paciente
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       }
     >
       <div className="space-y-4 animate-fade-in">
         {/* Funil de status */}
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {statusFunil.map((s) => {
-            const count = pacientes.filter((p) => p.status === s.key).length;
+            const count = pacientes.filter((p: any) => p.status === s.key).length;
             return (
               <button
                 key={s.key}
                 onClick={() => setSelectedStatus(selectedStatus === s.key ? null : s.key)}
-                className={`stat-card rounded-xl p-3 text-left transition-all ${selectedStatus === s.key ? "border-[hsl(var(--teal))]" : ""}`}
+                className={`stat-card rounded-xl p-3 text-left transition-all ${selectedStatus === s.key ? "ring-1 ring-[hsl(var(--teal))]" : ""}`}
               >
                 <p className="text-lg font-bold text-foreground">{count}</p>
                 <p className="text-[11px] font-medium" style={{ color: s.color }}>{s.label}</p>
@@ -77,95 +168,108 @@ export default function Pacientes() {
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
+            <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[hsl(var(--surface-2))] border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[hsl(var(--teal))] focus:border-[hsl(var(--teal))]"
+              className="bg-[hsl(var(--surface-2))] border-border pl-10 h-10"
               placeholder="Buscar por nome, CPF, telefone..."
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[hsl(var(--surface-2))] border border-border text-sm text-muted-foreground hover:text-foreground hover:border-[hsl(var(--teal)/0.3)] transition-all">
+          <Button variant="outline" className="flex items-center gap-2 bg-[hsl(var(--surface-2))] border-border text-muted-foreground hover:text-foreground">
             <Filter className="w-4 h-4" />
             Filtros
             <ChevronDown className="w-3 h-3" />
-          </button>
+          </Button>
         </div>
 
         {/* Table */}
-        <div className="stat-card rounded-xl overflow-hidden">
+        <div className="stat-card rounded-xl overflow-hidden border border-border">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b border-border bg-[hsl(var(--surface-2)/0.5)]">
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Paciente</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden md:table-cell">Contato</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden lg:table-cell">Convênio</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Status</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden xl:table-cell">Tags</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden lg:table-cell">Última Consulta</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden xl:table-cell">Valor Total</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((p, i) => {
-                  const sc = statusConfig[p.status];
-                  return (
-                    <tr key={p.id} className={`border-b border-border/50 hover:bg-[hsl(var(--surface-2))] transition-colors cursor-pointer ${i % 2 === 0 ? "" : "bg-[hsl(var(--surface-1)/0.5)]"}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-bold text-[hsl(var(--primary-foreground))]">
-                              {p.nome.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                            </span>
+              <tbody className="divide-y divide-border/50">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-20 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto text-[hsl(var(--teal))]" />
+                      <p className="mt-2 text-sm text-muted-foreground">Carregando pacientes...</p>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                      Nenhum paciente encontrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((p: any, i: number) => {
+                    const sc = statusConfig[p.status] || statusConfig.lead;
+                    return (
+                      <tr key={p.id} className={`hover:bg-[hsl(var(--surface-2))] transition-colors cursor-pointer ${i % 2 === 0 ? "" : "bg-[hsl(var(--surface-1)/0.5)]"}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-[hsl(var(--primary-foreground))]">
+                                {p.nome.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{p.nome}</p>
+                              <p className="text-xs text-muted-foreground">{p.cpf || "—"}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{p.nome}</p>
-                            <p className="text-xs text-muted-foreground">{p.cpf}</p>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Phone className="w-3 h-3" />
+                              {p.telefone || "—"}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Mail className="w-3 h-3" />
+                              {p.email || "—"}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Phone className="w-3 h-3" />
-                            {p.telefone}
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <span className="text-sm text-muted-foreground">{p.convenio}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`status-badge text-[10px] ${sc.color} ${sc.bg}`}>{sc.label}</span>
+                        </td>
+                        <td className="px-4 py-3 hidden xl:table-cell">
+                          <div className="flex gap-1 flex-wrap">
+                            {p.tags?.map((tag: string) => (
+                              <span key={tag} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[hsl(var(--surface-3))] text-muted-foreground">
+                                {tag}
+                              </span>
+                            )) || "—"}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Mail className="w-3 h-3" />
-                            {p.email}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-sm text-muted-foreground">{p.convenio}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`status-badge ${sc.color} ${sc.bg}`}>{sc.label}</span>
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        <div className="flex gap-1 flex-wrap">
-                          {p.tags.map((tag) => (
-                            <span key={tag} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[hsl(var(--surface-3))] text-muted-foreground">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-sm text-muted-foreground">{p.ultimaConsulta}</span>
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        <span className="text-sm font-semibold text-[hsl(var(--teal))]">{p.valor}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button className="p-1.5 rounded hover:bg-[hsl(var(--surface-3))] transition-colors">
-                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <span className="text-sm text-muted-foreground">
+                            {p.ultima_consulta ? new Date(p.ultima_consulta).toLocaleDateString("pt-BR") : "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button className="p-1.5 rounded hover:bg-[hsl(var(--surface-3))] transition-colors">
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -174,3 +278,4 @@ export default function Pacientes() {
     </AppLayout>
   );
 }
+
