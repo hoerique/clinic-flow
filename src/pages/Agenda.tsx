@@ -1,8 +1,16 @@
 import { AppLayout } from "@/components/AppLayout";
 import { ChevronLeft, ChevronRight, Plus, Clock, User, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useAgendamentos, useProfissionais, usePacientes, useCreateAgendamento } from "@/hooks/useSupabase";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { useAgendamentos, useProfissionais, usePacientes, useCreateAgendamento, useUpdateAgendamento } from "@/hooks/useSupabase";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,15 +44,25 @@ export default function Agenda() {
     paciente_id: "",
     profissional_id: "",
     procedimento: "",
-    data_hora: new Date().toISOString(),
+    data: new Date().toISOString().split('T')[0],
+    hora: "08:00",
     duracao_slots: 2,
-    hora: "08:00", // Auxiliar field
   });
 
   const { data: agendamentos = [], isLoading: loadingApts } = useAgendamentos();
   const { data: profissionais = [], isLoading: loadingProfs } = useProfissionais();
   const { data: pacientes = [] } = usePacientes();
   const createAgendamento = useCreateAgendamento();
+  const updateAgendamento = useUpdateAgendamento();
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      await updateAgendamento.mutateAsync({ id, status: newStatus });
+      toast.success("Status atualizado!");
+    } catch (error) {
+      toast.error("Erro ao atualizar status");
+    }
+  };
 
   const agendamentosFiltrados = agendamentos.filter(
     (a: any) => selectedProf === null || a.profissional_id === selectedProf
@@ -52,15 +70,19 @@ export default function Agenda() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newAgendamento.paciente_id || !newAgendamento.profissional_id) {
+      toast.error("Selecione o paciente e o profissional");
+      return;
+    }
+
     try {
-      // Construct date string with chosen hour
-      const date = new Date();
       const [h, m] = newAgendamento.hora.split(":");
+      const date = new Date(`${newAgendamento.data}T00:00:00`);
       date.setHours(parseInt(h), parseInt(m), 0, 0);
 
       await createAgendamento.mutateAsync({
-        paciente_id: parseInt(newAgendamento.paciente_id),
-        profissional_id: parseInt(newAgendamento.profissional_id),
+        paciente_id: newAgendamento.paciente_id,
+        profissional_id: newAgendamento.profissional_id,
         procedimento: newAgendamento.procedimento,
         data_hora: date.toISOString(),
         duracao_slots: newAgendamento.duracao_slots,
@@ -68,6 +90,14 @@ export default function Agenda() {
 
       toast.success("Agendamento criado com sucesso!");
       setIsDialogOpen(false);
+      setNewAgendamento({
+        paciente_id: "",
+        profissional_id: "",
+        procedimento: "",
+        data: new Date().toISOString().split('T')[0],
+        hora: "08:00",
+        duracao_slots: 2,
+      });
     } catch (error) {
       toast.error("Erro ao criar agendamento");
     }
@@ -90,6 +120,7 @@ export default function Agenda() {
           <DialogContent className="sm:max-w-[425px] bg-[hsl(var(--surface-1))] border-border">
             <DialogHeader>
               <DialogTitle className="text-foreground">NOVO AGENDAMENTO</DialogTitle>
+              <DialogDescription className="sr-only">Selecione o paciente, o profissional e o horário para o novo agendamento.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4 py-4">
               <div className="space-y-2">
@@ -130,18 +161,28 @@ export default function Agenda() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">Hora</Label>
-                  <Select onValueChange={(v) => setNewAgendamento({ ...newAgendamento, hora: v })}>
-                    <SelectTrigger className="bg-[hsl(var(--surface-2))] border-border text-foreground">
-                      <SelectValue placeholder="08:00" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[hsl(var(--surface-1))] border-border">
-                      {horasdia.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-muted-foreground">Data</Label>
+                  <Input
+                    type="date"
+                    required
+                    value={newAgendamento.data}
+                    onChange={(e) => setNewAgendamento({ ...newAgendamento, data: e.target.value })}
+                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                  />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Hora</Label>
+                <Select onValueChange={(v) => setNewAgendamento({ ...newAgendamento, hora: v })} defaultValue={newAgendamento.hora}>
+                  <SelectTrigger className="bg-[hsl(var(--surface-2))] border-border text-foreground">
+                    <SelectValue placeholder="08:00" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[hsl(var(--surface-1))] border-border">
+                    {horasdia.map((h) => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <DialogFooter>
                 <Button
@@ -239,18 +280,34 @@ export default function Agenda() {
                           const top = horaIdx * 56;
                           const height = (apt.duracao_slots || 2) * 56 - 4;
                           return (
-                            <div
-                              key={idx}
-                              className={`absolute left-1 right-1 rounded-lg border-l-2 p-2 pointer-events-auto cursor-pointer ${statusColor[apt.status] || statusColor.agendado}`}
-                              style={{ top: top + 2, height, borderLeftColor: prof.cor }}
-                            >
-                              <p className={`text-[10px] font-bold truncate ${statusText[apt.status] || statusText.agendado}`}>{apt.pacientes?.nome || apt.paciente_nome}</p>
-                              <p className="text-[9px] text-muted-foreground truncate">{apt.procedimento}</p>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <Clock className="w-2 h-2 text-muted-foreground" />
-                                <span className="text-[9px] text-muted-foreground">{aptHora}</span>
-                              </div>
-                            </div>
+                            <DropdownMenu key={apt.id}>
+                              <DropdownMenuTrigger asChild>
+                                <div
+                                  className={`absolute left-1 right-1 rounded-lg border-l-2 p-2 pointer-events-auto cursor-pointer ${statusColor[apt.status] || statusColor.agendado}`}
+                                  style={{ top: top + 2, height, borderLeftColor: prof.cor }}
+                                >
+                                  <p className={`text-[10px] font-bold truncate ${statusText[apt.status] || statusText.agendado}`}>{apt.pacientes?.nome || apt.paciente_nome}</p>
+                                  <p className="text-[9px] text-muted-foreground truncate">{apt.procedimento}</p>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Clock className="w-2 h-2 text-muted-foreground" />
+                                    <span className="text-[9px] text-muted-foreground">{aptHora}</span>
+                                  </div>
+                                </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="bg-[hsl(var(--surface-1))] border-border">
+                                <DropdownMenuLabel>Atualizar Status</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {Object.keys(statusText).map((st) => (
+                                  <DropdownMenuItem
+                                    key={st}
+                                    onClick={() => handleStatusChange(apt.id, st)}
+                                    className="capitalize text-xs"
+                                  >
+                                    {st}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           );
                         })}
                       </div>

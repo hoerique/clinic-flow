@@ -61,11 +61,8 @@ export function Sidebar() {
     <aside className="flex flex-col w-64 min-h-screen bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))]">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-[hsl(var(--sidebar-border))]">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl gradient-primary shadow-teal">
-          <Stethoscope className="w-5 h-5 text-[hsl(var(--primary-foreground))]" />
-        </div>
         <div>
-          <p className="text-sm font-bold text-foreground tracking-tight">ClinicCRM</p>
+          <p className="text-sm font-bold text-foreground tracking-tight">CRM Luiza</p>
           <p className="text-[10px] text-muted-foreground font-medium">Clínica Sorriso Premium</p>
         </div>
       </div>
@@ -96,18 +93,16 @@ export function Sidebar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all duration-150 ${
-                    active ? "nav-item-active" : "nav-item"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all duration-150 ${active ? "nav-item-active" : "nav-item"
+                    }`}
                 >
                   <Icon className={`w-4 h-4 flex-shrink-0 ${active ? "text-[hsl(var(--teal))]" : ""}`} />
                   <span className="flex-1">{item.label}</span>
                   {item.badge && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                      item.badge === "Novo"
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${item.badge === "Novo"
                         ? "bg-[hsl(var(--teal)/0.2)] text-[hsl(var(--teal))]"
                         : "bg-[hsl(var(--surface-3))] text-muted-foreground"
-                    }`}>
+                      }`}>
                       {item.badge}
                     </span>
                   )}

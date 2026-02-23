@@ -46,6 +46,24 @@ export function useProfissionais() {
   });
 }
 
+export function useUpdateAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string;[key: string]: any }) => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .update(updates)
+        .eq("id", id)
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agendamentos"] });
+    },
+  });
+}
+
 export function useAgendamentos() {
   return useQuery({
     queryKey: ["agendamentos"],
@@ -76,6 +94,109 @@ export function useCreateAgendamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agendamentos"] });
+    },
+  });
+}
+
+export function useOportunidades() {
+  return useQuery({
+    queryKey: ["oportunidades"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("oportunidades")
+        .select(`
+          *,
+          pacientes (nome),
+          profissionais (nome)
+        `)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateOportunidade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (newOportunidade: any) => {
+      const { data, error } = await supabase
+        .from("oportunidades")
+        .insert([newOportunidade])
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["oportunidades"] });
+    },
+  });
+}
+
+export function useUpdateOportunidade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string;[key: string]: any }) => {
+      const { data, error } = await supabase
+        .from("oportunidades")
+        .update(updates)
+        .eq("id", id)
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["oportunidades"] });
+    },
+  });
+}
+export function useDeleteOportunidade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("oportunidades")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["oportunidades"] });
+    },
+  });
+}
+
+export function useMovimentacoes() {
+  return useQuery({
+    queryKey: ["movimentacoes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("movimentacoes")
+        .select(`
+          *,
+          pacientes (nome)
+        `)
+        .order("data", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateMovimentacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (newMov: any) => {
+      const { data, error } = await supabase
+        .from("movimentacoes")
+        .insert([newMov])
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["movimentacoes"] });
     },
   });
 }

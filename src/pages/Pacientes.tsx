@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Search, Filter, Plus, MoreVertical, Phone, Mail, Tag, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { usePacientes, useCreatePaciente } from "@/hooks/useSupabase";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,20 +53,29 @@ export default function Pacientes() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log("Enviando novo paciente:", newPaciente);
       await createPaciente.mutateAsync(newPaciente);
+
       toast.success("Paciente cadastrado com sucesso!");
       setIsDialogOpen(false);
-      setNewPaciente({
-        nome: "",
-        cpf: "",
-        telefone: "",
-        email: "",
-        convenio: "Particular",
-        status: "lead",
-        tags: [],
-      });
-    } catch (error) {
-      toast.error("Erro ao cadastrar paciente");
+
+      // Pequeno delay no reset do estado para evitar flicker ou conflitos de renderização no Dialog
+      setTimeout(() => {
+        setNewPaciente({
+          nome: "",
+          cpf: "",
+          telefone: "",
+          email: "",
+          convenio: "Particular",
+          status: "lead",
+          tags: [],
+        });
+      }, 100);
+    } catch (error: any) {
+      console.error("Erro detalhado ao cadastrar paciente:", error);
+      const errorMessage = error.message || "Erro desconhecido";
+      const detail = error.details || "";
+      toast.error(`Erro ao cadastrar: ${errorMessage}. ${detail}`);
     }
   };
 
@@ -85,6 +94,7 @@ export default function Pacientes() {
           <DialogContent className="sm:max-w-[425px] bg-[hsl(var(--surface-1))] border-border">
             <DialogHeader>
               <DialogTitle className="text-foreground">CADASTRAR NOVO PACIENTE</DialogTitle>
+              <DialogDescription className="sr-only">Preencha os dados abaixo para cadastrar um novo paciente no sistema.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4 py-4">
               <div className="space-y-2">
@@ -135,10 +145,13 @@ export default function Pacientes() {
                 <Button
                   type="submit"
                   disabled={createPaciente.isPending}
-                  className="gradient-primary text-[hsl(var(--primary-foreground))] w-full"
+                  className="gradient-primary text-[hsl(var(--primary-foreground))] w-full flex items-center justify-center gap-2"
                 >
-                  {createPaciente.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Salvar Paciente
+                  {createPaciente.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Salvar Paciente"
+                  )}
                 </Button>
               </DialogFooter>
             </form>

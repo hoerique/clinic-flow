@@ -1,6 +1,8 @@
 import { AppLayout } from "@/components/AppLayout";
 import { DollarSign, TrendingUp, AlertCircle, CreditCard, ArrowUpRight, ArrowDownRight, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { useMovimentacoes } from "@/hooks/useSupabase";
+import { Loader2 } from "lucide-react";
 
 const faturamentoMensal = [
   { mes: "Ago", receita: 42000, despesas: 28000 },
@@ -50,6 +52,37 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Financeiro() {
+  const { data: movimentacoes = [], isLoading } = useMovimentacoes();
+
+  const receitas = movimentacoes.filter(m => m.tipo === 'entrada');
+  const despesas = movimentacoes.filter(m => m.tipo === 'saida');
+
+  const totalReceita = receitas.reduce((acc, m) => acc + (m.valor || 0), 0);
+  const totalDespesa = despesas.reduce((acc, m) => acc + (m.valor || 0), 0);
+  const lucroLiquido = totalReceita - totalDespesa;
+
+  const inadimplencia = movimentacoes
+    .filter(m => m.status === 'pendente' || m.status === 'vencido')
+    .reduce((acc, m) => acc + (m.valor || 0), 0);
+
+  const kpis = [
+    { label: "Receita Total", value: `R$ ${(totalReceita / 1000).toFixed(1)}k`, trend: "+10%", up: true, icon: DollarSign, color: "teal" },
+    { label: "Lucro Líquido", value: `R$ ${(lucroLiquido / 1000).toFixed(1)}k`, trend: "+12%", up: true, icon: TrendingUp, color: "success" },
+    { label: "Ticket Médio", value: `R$ ${receitas.length > 0 ? (totalReceita / receitas.length).toFixed(0) : 0}`, trend: "+5%", up: true, icon: CreditCard, color: "info" },
+    { label: "Inadimplência", value: `R$ ${(inadimplencia / 1000).toFixed(1)}k`, trend: "-2%", up: false, icon: AlertCircle, color: "destructive" },
+  ];
+
+  // Agrupar por mês para o gráfico (Simplificado para o mês atual)
+  const currentMonth = new Date().toLocaleDateString('pt-BR', { month: 'short' });
+  const dynamicFaturamentoData = [{
+    mes: currentMonth,
+    receita: totalReceita,
+    despesas: totalDespesa
+  }];
+
+  const displayFaturamentoData = totalReceita > 0 || totalDespesa > 0
+    ? dynamicFaturamentoData
+    : faturamentoMensal;
   return (
     <AppLayout
       title="Financeiro"
@@ -64,12 +97,7 @@ export default function Financeiro() {
       <div className="space-y-6 animate-fade-in">
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: "Receita Mensal", value: "R$ 71.4k", trend: "+15%", up: true, icon: DollarSign, color: "teal" },
-            { label: "Lucro Líquido", value: "R$ 30.4k", trend: "+22%", up: true, icon: TrendingUp, color: "success" },
-            { label: "Ticket Médio", value: "R$ 380", trend: "+8%", up: true, icon: CreditCard, color: "info" },
-            { label: "Inadimplência", value: "R$ 4.100", trend: "-5%", up: false, icon: AlertCircle, color: "destructive" },
-          ].map((kpi, i) => {
+          {kpis.map((kpi, i) => {
             const Icon = kpi.icon;
             const colorMap: Record<string, string> = {
               teal: "hsl(var(--teal))", success: "hsl(var(--success))",
@@ -87,7 +115,11 @@ export default function Financeiro() {
                     {kpi.trend}
                   </span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-0.5">{kpi.label}</p>
               </div>
             );
@@ -154,7 +186,7 @@ export default function Financeiro() {
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Total</span>
-                <span className="text-sm font-bold text-[hsl(var(--teal))]">R$ 71.4k</span>
+                <span className="text-sm font-bold text-[hsl(var(--teal))]">R$ {(totalReceita / 1000).toFixed(1)}k</span>
               </div>
             </div>
           </div>
@@ -176,22 +208,38 @@ export default function Financeiro() {
                 </tr>
               </thead>
               <tbody>
-                {pagamentos.map((p, i) => {
-                  const sc = statusPag[p.status];
-                  return (
-                    <tr key={p.id} className="border-b border-border/30 hover:bg-[hsl(var(--surface-2))] transition-colors">
-                      <td className="px-4 py-3 text-sm font-semibold text-foreground">{p.paciente}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{p.proc}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-[hsl(var(--teal))]">{p.valor}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{p.forma}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{p.parcelas}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{p.data}</td>
-                      <td className="px-4 py-3">
-                        <span className={`status-badge ${sc.color} ${sc.bg}`}>{sc.label}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                    </td>
+                  </tr>
+                ) : movimentacoes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground text-sm">
+                      Nenhum lançamento registrado.
+                    </td>
+                  </tr>
+                ) : (
+                  movimentacoes.slice(0, 10).map((m: any) => {
+                    const sc = statusPag[m.status || 'pago'];
+                    return (
+                      <tr key={m.id} className="border-b border-border/30 hover:bg-[hsl(var(--surface-2))] transition-colors">
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground">{m.pacientes?.nome || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{m.categoria || m.tipo}</td>
+                        <td className={`px-4 py-3 text-sm font-bold ${m.tipo === 'entrada' ? 'text-[hsl(var(--teal))]' : 'text-[hsl(var(--destructive))]'}`}>
+                          {m.tipo === 'entrada' ? '+' : '-'} R$ {m.valor?.toLocaleString('pt-BR')}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">—</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">1x</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(m.data).toLocaleDateString('pt-BR')}</td>
+                        <td className="px-4 py-3">
+                          <span className={`status-badge ${sc.color} ${sc.bg}`}>{sc.label}</span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

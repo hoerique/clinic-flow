@@ -7,7 +7,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { usePacientes, useAgendamentos } from "@/hooks/useSupabase";
+import { usePacientes, useAgendamentos, useOportunidades } from "@/hooks/useSupabase";
 
 const revenueData = [
   { mes: "Ago", receita: 42000, meta: 50000 },
@@ -71,62 +71,111 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Dashboard() {
   const { data: pacientes = [], isLoading: loadingPacientes } = usePacientes();
   const { data: agendamentos = [], isLoading: loadingAgendamentos } = useAgendamentos();
+  const { data: oportunidades = [], isLoading: loadingOportunidades } = useOportunidades();
 
   const totalPacientes = pacientes.length;
-  const agendamentosHoje = agendamentos.length; // Simplified for demo
-  const confirmados = agendamentos.filter((a: any) => a.status === 'confirmado').length;
-  const faltas = agendamentos.filter((a: any) => a.status === 'faltou').length;
+
+  // Agendamentos hoje
+  const hoje = new Date().toISOString().split('T')[0];
+  const agendamentosHoje = agendamentos.filter((a: any) => a.data_hora.startsWith(hoje));
+  const confirmados = agendamentosHoje.filter((a: any) => a.status === 'confirmado').length;
+  const faltas = agendamentosHoje.filter((a: any) => a.status === 'faltou').length;
+
+  // KPIs Financeiros
+  const fechados = oportunidades.filter((o: any) => o.etapa === "fechado");
+  const receitaTotal = fechados.reduce((acc, o) => acc + (o.valor || 0), 0);
+  const ticketMedio = fechados.length > 0 ? receitaTotal / fechados.length : 0;
+
+  // Taxa de comparecimento (histórica)
+  const totalConcluidos = agendamentos.filter((a: any) => a.status === 'realizado').length;
+  const totalFaltas = agendamentos.filter((a: any) => a.status === 'faltou').length;
+  const taxaComparecimento = (totalConcluidos + totalFaltas) > 0
+    ? Math.round((totalConcluidos / (totalConcluidos + totalFaltas)) * 100)
+    : 0;
+
+  // Orçamentos
+  const orcamentosEnviados = oportunidades.length;
+  const taxaConversao = oportunidades.length > 0
+    ? Math.round((fechados.length / oportunidades.length) * 100)
+    : 0;
 
   const kpis = [
     {
       label: "Total Pacientes",
       value: totalPacientes.toString(),
       sub: "Base de dados atualizada",
-      trend: "up",
+      trend: "neutral",
       icon: Users,
       color: "teal",
     },
     {
-      label: "Receita Mensal",
-      value: "R$ 71.4k",
-      sub: "+15% vs mês anterior",
+      label: "Receita Total",
+      value: `R$ ${(receitaTotal / 1000).toFixed(1)}k`,
+      sub: `${fechados.length} vendas fechadas`,
       trend: "up",
       icon: DollarSign,
       color: "success",
     },
     {
       label: "Taxa de Comparecimento",
-      value: "84%",
-      sub: "-3% vs mês anterior",
-      trend: "down",
+      value: `${taxaComparecimento}%`,
+      sub: `${totalConcluidos} realizados vs ${totalFaltas} faltas`,
+      trend: taxaComparecimento > 80 ? "up" : "down",
       icon: CheckCircle,
       color: "warning",
     },
     {
       label: "Ticket Médio",
-      value: "R$ 380",
-      sub: "+8% vs mês anterior",
+      value: `R$ ${ticketMedio.toFixed(0)}`,
+      sub: "Baseado em vendas fechadas",
       trend: "up",
       icon: TrendingUp,
       color: "info",
     },
     {
-      label: "Orçamentos Enviados",
-      value: "23",
-      sub: "Taxa conversão: 65%",
+      label: "Oportunidades",
+      value: orcamentosEnviados.toString(),
+      sub: `Taxa conversão: ${taxaConversao}%`,
       trend: "up",
       icon: Activity,
       color: "teal",
     },
     {
       label: "Agenda Hoje",
-      value: agendamentosHoje.toString(),
-      sub: `${confirmados} confirmados, ${faltas} faltaram`,
+      value: agendamentosHoje.length.toString(),
+      sub: `${confirmados} confirmados, ${faltas} faltas`,
       trend: "neutral",
       icon: Calendar,
       color: "info",
     },
   ];
+
+  // Agrupar procedimentos para o gráfico de pizza
+  const procedimentosMap = agendamentos.reduce((acc: any, apt: any) => {
+    const proc = apt.procedimento || "Outros";
+    acc[proc] = (acc[proc] || 0) + 1;
+    return acc;
+  }, {});
+
+  const procColors = ["#2DD4BF", "#38BDF8", "#818CF8", "#FB923C", "#4ADE80"];
+  const dynamicProcedimentosData = Object.entries(procedimentosMap)
+    .map(([name, count], i) => ({
+      name,
+      value: Math.round(((count as number) / agendamentos.length) * 100),
+      color: procColors[i % procColors.length]
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const displayProcedimentosData = dynamicProcedimentosData.length > 0
+    ? dynamicProcedimentosData
+    : procedimentosData;
+
+  // Gráfico de Receita (Simplificado: usa o mês atual)
+  const currentMonth = new Date().toLocaleDateString('pt-BR', { month: 'short' });
+  const displayRevenueData = receitaTotal > 0
+    ? [{ mes: currentMonth, receita: receitaTotal, meta: 50000 }]
+    : revenueData;
 
   return (
     <AppLayout
@@ -155,7 +204,7 @@ export default function Dashboard() {
                     <ArrowDownRight className="w-4 h-4 text-[hsl(var(--destructive))]" />
                   )}
                 </div>
-                {(loadingPacientes || loadingAgendamentos) && (kpi.label === "Total Pacientes" || kpi.label === "Agenda Hoje") ? (
+                {(loadingPacientes || loadingAgendamentos || loadingOportunidades) && (kpi.label === "Total Pacientes" || kpi.label === "Agenda Hoje" || kpi.label === "Receita Total") ? (
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 ) : (
                   <p className="text-xl font-bold text-foreground">{kpi.value}</p>
@@ -181,7 +230,7 @@ export default function Dashboard() {
               </span>
             </div>
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={revenueData}>
+              <AreaChart data={displayRevenueData}>
                 <defs>
                   <linearGradient id="receitaGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(174, 72%, 45%)" stopOpacity={0.3} />
@@ -208,8 +257,8 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mb-4">Top 5 este mês</p>
             <ResponsiveContainer width="100%" height={160}>
               <PieChart>
-                <Pie data={procedimentosData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                  {procedimentosData.map((entry, index) => (
+                <Pie data={displayProcedimentosData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                  {displayProcedimentosData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -217,7 +266,7 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="space-y-1.5">
-              {procedimentosData.map((item) => (
+              {displayProcedimentosData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
@@ -243,10 +292,10 @@ export default function Dashboard() {
                 <div className="flex justify-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : agendamentos.length === 0 ? (
+              ) : agendamentosHoje.length === 0 ? (
                 <p className="text-sm text-center py-10 text-muted-foreground">Nenhum agendamento para hoje.</p>
               ) : (
-                agendamentos.slice(0, 6).map((apt: any, i: number) => {
+                agendamentosHoje.slice(0, 6).map((apt: any, i: number) => {
                   const aptDate = new Date(apt.data_hora);
                   const aptHora = `${aptDate.getHours().toString().padStart(2, '0')}:${aptDate.getMinutes().toString().padStart(2, '0')}`;
                   return (
