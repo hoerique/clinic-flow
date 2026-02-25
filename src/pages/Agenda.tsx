@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/AppLayout";
-import { ChevronLeft, ChevronRight, Plus, Clock, User, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useAgendamentos, useProfissionais, usePacientes, useCreateAgendamento, useUpdateAgendamento } from "@/hooks/useSupabase";
+import { useAgendamentos, useProfissionais, usePacientes, useUpdateAgendamento } from "@/hooks/useSupabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,13 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import React from "react";
+import { CreateAgendamentoModal } from "@/components/CreateAgendamentoModal";
 
 const horasdia = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"];
 
@@ -39,20 +36,10 @@ const statusText: Record<string, string> = {
 export default function Agenda() {
   const [selectedProf, setSelectedProf] = useState<number | null>(null);
   const [view, setView] = useState<"dia" | "semana">("dia");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAgendamento, setNewAgendamento] = useState({
-    paciente_id: "",
-    profissional_id: "",
-    procedimento: "",
-    data: new Date().toISOString().split('T')[0],
-    hora: "08:00",
-    duracao_slots: 2,
-  });
 
   const { data: agendamentos = [], isLoading: loadingApts } = useAgendamentos();
   const { data: profissionais = [], isLoading: loadingProfs } = useProfissionais();
   const { data: pacientes = [] } = usePacientes();
-  const createAgendamento = useCreateAgendamento();
   const updateAgendamento = useUpdateAgendamento();
 
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -68,40 +55,6 @@ export default function Agenda() {
     (a: any) => selectedProf === null || a.profissional_id === selectedProf
   );
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAgendamento.paciente_id || !newAgendamento.profissional_id) {
-      toast.error("Selecione o paciente e o profissional");
-      return;
-    }
-
-    try {
-      const [h, m] = newAgendamento.hora.split(":");
-      const date = new Date(`${newAgendamento.data}T00:00:00`);
-      date.setHours(parseInt(h), parseInt(m), 0, 0);
-
-      await createAgendamento.mutateAsync({
-        paciente_id: newAgendamento.paciente_id,
-        profissional_id: newAgendamento.profissional_id,
-        procedimento: newAgendamento.procedimento,
-        data_hora: date.toISOString(),
-        duracao_slots: newAgendamento.duracao_slots,
-      });
-
-      toast.success("Agendamento criado com sucesso!");
-      setIsDialogOpen(false);
-      setNewAgendamento({
-        paciente_id: "",
-        profissional_id: "",
-        procedimento: "",
-        data: new Date().toISOString().split('T')[0],
-        hora: "08:00",
-        duracao_slots: 2,
-      });
-    } catch (error) {
-      toast.error("Erro ao criar agendamento");
-    }
-  };
 
   const hoje = new Date();
 
@@ -109,95 +62,7 @@ export default function Agenda() {
     <AppLayout
       title="Agenda"
       subtitle="Visualize e gerencie os agendamentos"
-      action={
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2 gradient-primary text-[hsl(var(--primary-foreground))] hover:opacity-90 shadow-teal">
-              <Plus className="w-4 h-4" />
-              Novo Agendamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-[hsl(var(--surface-1))] border-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">NOVO AGENDAMENTO</DialogTitle>
-              <DialogDescription className="sr-only">Selecione o paciente, o profissional e o horário para o novo agendamento.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Paciente</Label>
-                <Select onValueChange={(v) => setNewAgendamento({ ...newAgendamento, paciente_id: v })}>
-                  <SelectTrigger className="bg-[hsl(var(--surface-2))] border-border text-foreground">
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--surface-1))] border-border">
-                    {pacientes.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Profissional</Label>
-                <Select onValueChange={(v) => setNewAgendamento({ ...newAgendamento, profissional_id: v })}>
-                  <SelectTrigger className="bg-[hsl(var(--surface-2))] border-border text-foreground">
-                    <SelectValue placeholder="Selecione o profissional" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--surface-1))] border-border">
-                    {profissionais.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Procedimento</Label>
-                  <Input
-                    required
-                    value={newAgendamento.procedimento}
-                    onChange={(e) => setNewAgendamento({ ...newAgendamento, procedimento: e.target.value })}
-                    placeholder="Ex: Limpeza"
-                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Data</Label>
-                  <Input
-                    type="date"
-                    required
-                    value={newAgendamento.data}
-                    onChange={(e) => setNewAgendamento({ ...newAgendamento, data: e.target.value })}
-                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Hora</Label>
-                <Select onValueChange={(v) => setNewAgendamento({ ...newAgendamento, hora: v })} defaultValue={newAgendamento.hora}>
-                  <SelectTrigger className="bg-[hsl(var(--surface-2))] border-border text-foreground">
-                    <SelectValue placeholder="08:00" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--surface-1))] border-border">
-                    {horasdia.map((h) => (
-                      <SelectItem key={h} value={h}>{h}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="submit"
-                  disabled={createAgendamento.isPending}
-                  className="gradient-primary text-[hsl(var(--primary-foreground))] w-full"
-                >
-                  {createAgendamento.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Confirmar Agendamento
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      }
+      action={<CreateAgendamentoModal pacientes={pacientes} profissionais={profissionais} />}
     >
       <div className="space-y-4 animate-fade-in">
         <div className="flex items-center justify-between">
@@ -238,7 +103,7 @@ export default function Agenda() {
                 key={p.id}
                 onClick={() => setSelectedProf(selectedProf === p.id ? null : p.id)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedProf === p.id ? "ring-1" : "bg-[hsl(var(--surface-2))] text-muted-foreground hover:text-foreground"}`}
-                style={selectedProf === p.id ? { ringColor: p.cor, color: p.cor, background: `${p.cor}1A` } : {}}
+                style={selectedProf === p.id ? { boxShadow: `0 0 0 1px ${p.cor}`, color: p.cor, background: `${p.cor}1A` } : {}}
               >
                 <div className="w-2 h-2 rounded-full" style={{ background: p.cor }} />
                 {p.nome}

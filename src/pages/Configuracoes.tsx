@@ -1,5 +1,6 @@
 import { AppLayout } from "../components/AppLayout";
 import { useState, useEffect } from "react";
+import { useTheme } from "../components/theme-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -35,6 +36,7 @@ const tabs = [
 ];
 
 export default function Configuracoes() {
+  const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   console.log("AppLayout import check:", !!AppLayout);
   const [activeTab, setActiveTab] = useState("clinica");
   const [saved, setSaved] = useState(false);
@@ -49,12 +51,46 @@ export default function Configuracoes() {
     whatsapp_url: "",
     webhook_url: "",
     webhook_secret: "",
-    uzapi_token: ""
+    uzapi_token: "",
+  });
+
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    appointment_confirmation: true,
+    appointment_cancellation: true,
+    new_patient: false,
+    empty_schedule: true,
+    weekly_report: false,
+    overdue_payment: true
   });
 
   useEffect(() => {
     fetchApiConfigs();
+    fetchNotificationPrefs();
   }, []);
+
+  const fetchNotificationPrefs = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('notification_preferences')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error("Erro ao buscar preferências de notificação:", error);
+        return;
+      }
+
+      if (data?.notification_preferences) {
+        setNotificationPrefs(data.notification_preferences as any);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar preferências de notificação:", error);
+    }
+  };
 
   const fetchApiConfigs = async () => {
     try {
@@ -126,9 +162,30 @@ export default function Configuracoes() {
     }
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          notification_preferences: notificationPrefs,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success("Preferências salvas com sucesso!");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error: any) {
+      toast.error("Erro ao salvar: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -271,32 +328,40 @@ export default function Configuracoes() {
             <div className="bg-[hsl(var(--surface-1))] border border-border rounded-xl p-6 space-y-5">
               <h3 className="text-sm font-semibold text-foreground">Preferências de Notificação</h3>
               {[
-                { label: "Confirmação de agendamento", desc: "Notificar quando um paciente confirmar consulta", active: true },
-                { label: "Cancelamento de consulta", desc: "Alertar sobre cancelamentos em tempo real", active: true },
-                { label: "Novo paciente cadastrado", desc: "Receber notificação de novos cadastros", active: false },
-                { label: "Lembrete de agenda vazia", desc: "Avisar sobre horários sem agendamento", active: true },
-                { label: "Relatório semanal", desc: "Receber resumo de desempenho toda segunda-feira", active: false },
-                { label: "Inadimplência detectada", desc: "Alertar sobre pagamentos em atraso", active: true },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                { id: "appointment_confirmation", label: "Confirmação de agendamento", desc: "Notificar quando um paciente confirmar consulta" },
+                { id: "appointment_cancellation", label: "Cancelamento de consulta", desc: "Alertar sobre cancelamentos em tempo real" },
+                { id: "new_patient", label: "Novo paciente cadastrado", desc: "Receber notificação de novos cadastros" },
+                { id: "empty_schedule", label: "Lembrete de agenda vazia", desc: "Avisar sobre horários sem agendamento" },
+                { id: "weekly_report", label: "Relatório semanal", desc: "Receber resumo de desempenho toda segunda-feira" },
+                { id: "overdue_payment", label: "Inadimplência detectada", desc: "Alertar sobre pagamentos em atraso" },
+              ].map((item) => {
+                const isActive = (notificationPrefs as any)[item.id];
+                return (
+                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => setNotificationPrefs(prev => ({ ...prev, [item.id]: !isActive }))}
+                      className={`relative w-10 h-5.5 rounded-full transition-all flex-shrink-0 ${isActive ? "gradient-primary" : "bg-[hsl(var(--surface-3))]"}`}
+                      style={{ height: "22px", width: "40px" }}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isActive ? "left-5" : "left-0.5"}`}
+                      />
+                    </button>
                   </div>
-                  <button
-                    className={`relative w-10 h-5.5 rounded-full transition-all flex-shrink-0 ${item.active ? "gradient-primary" : "bg-[hsl(var(--surface-3))]"}`}
-                    style={{ height: "22px", width: "40px" }}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${item.active ? "left-5" : "left-0.5"}`}
-                    />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               <div className="flex justify-end pt-2">
-                <button onClick={handleSave} className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold gradient-primary text-white shadow-teal hover:opacity-90 transition-all">
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold gradient-primary text-white shadow-teal hover:opacity-90 transition-all disabled:opacity-50"
+                >
                   <Save className="w-4 h-4" />
-                  {saved ? "Salvo!" : "Salvar"}
+                  {loading ? "Salvando..." : (saved ? "Salvo!" : "Salvar")}
                 </button>
               </div>
             </div>
@@ -381,15 +446,20 @@ export default function Configuracoes() {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-3">Modo de cores</p>
                 <div className="flex gap-3">
-                  {["Escuro", "Claro", "Sistema"].map((mode) => (
+                  {[
+                    { id: "dark", label: "Escuro" },
+                    { id: "light", label: "Claro" },
+                    { id: "system", label: "Sistema" },
+                  ].map((mode) => (
                     <button
-                      key={mode}
-                      className={`px-4 py-2 text-sm rounded-lg border font-medium transition-all ${mode === "Escuro"
+                      key={mode.id}
+                      onClick={() => setTheme(mode.id as any)}
+                      className={`px-4 py-2 text-sm rounded-lg border font-medium transition-all ${theme === mode.id
                         ? "border-[hsl(var(--teal))] bg-[hsl(var(--teal)/0.1)] text-[hsl(var(--teal))]"
                         : "border-border text-muted-foreground hover:border-[hsl(var(--teal)/0.4)]"
                         }`}
                     >
-                      {mode}
+                      {mode.label}
                     </button>
                   ))}
                 </div>
@@ -406,7 +476,11 @@ export default function Configuracoes() {
                     <button
                       key={c.name}
                       title={c.name}
-                      className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white/40 transition-all"
+                      onClick={() => setAccentColor(c.color)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${accentColor === c.color
+                        ? "border-white shadow-lg scale-110"
+                        : "border-transparent hover:border-white/40"
+                        }`}
                       style={{ backgroundColor: c.color }}
                     />
                   ))}

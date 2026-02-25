@@ -9,22 +9,9 @@ import {
 } from "recharts";
 import { usePacientes, useAgendamentos, useOportunidades } from "@/hooks/useSupabase";
 
-const revenueData = [
-  { mes: "Ago", receita: 42000, meta: 50000 },
-  { mes: "Set", receita: 51000, meta: 50000 },
-  { mes: "Out", receita: 47000, meta: 55000 },
-  { mes: "Nov", receita: 58000, meta: 55000 },
-  { mes: "Dez", receita: 62000, meta: 60000 },
-  { mes: "Jan", receita: 71000, meta: 65000 },
-];
+const revenueData: any[] = [];
 
-const procedimentosData = [
-  { name: "Limpeza", value: 34, color: "#2DD4BF" },
-  { name: "Ortodontia", value: 24, color: "#38BDF8" },
-  { name: "Clareamento", value: 19, color: "#818CF8" },
-  { name: "Implante", value: 14, color: "#FB923C" },
-  { name: "Outros", value: 9, color: "#4ADE80" },
-];
+const procedimentosData: any[] = [];
 
 const statusColors: Record<string, string> = {
   realizado: "text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)]",
@@ -54,12 +41,17 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-[hsl(var(--surface-1))] border border-border rounded-lg px-3 py-2 shadow-elevated">
-        <p className="text-xs font-semibold text-foreground mb-1">{label}</p>
+        {label && <p className="text-xs font-semibold text-foreground mb-1">{label}</p>}
         {payload.map((entry: any) => (
-          <p key={entry.name} className="text-xs" style={{ color: entry.color }}>
-            {entry.name}: {typeof entry.value === "number" && entry.name === "receita" || entry.name === "meta"
-              ? `R$ ${(entry.value / 1000).toFixed(0)}k`
-              : entry.value}
+          <p key={entry.name} className="text-xs text-foreground flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.payload?.fill }} />
+            <span className="opacity-80">{entry.name}:</span>
+            <span className="font-semibold">
+              {typeof entry.value === "number" && (entry.name === "receita" || entry.name === "meta")
+                ? `R$ ${(entry.value / 1000).toFixed(0)}k`
+                : entry.name === "Participação" ? `${entry.value}%` : entry.value}
+              {entry.name !== "receita" && entry.name !== "meta" && !entry.name.includes("Participação") && entry.unit === "%" ? "%" : ""}
+            </span>
           </p>
         ))}
       </div>
@@ -262,7 +254,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${value}%`, "Participação"]} contentStyle={{ background: "hsl(222, 44%, 10%)", border: "1px solid hsl(222, 36%, 16%)", borderRadius: "8px", fontSize: "12px" }} />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
             <div className="space-y-1.5">

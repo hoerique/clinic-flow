@@ -96,7 +96,8 @@ export default function Automacoes() {
 
   const toggleAgentStatus = async (agent: any) => {
     try {
-      const { error } = await (supabase.from("ai_agents") as any)
+      const { error } = await (supabase as any)
+        .from("ai_agents")
         .update({ ativo: !agent.ativo })
         .eq("id", agent.id);
 
@@ -127,10 +128,10 @@ export default function Automacoes() {
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: "Mensagens hoje", value: "47", color: "hsl(var(--teal))" },
-            { label: "Taxa de leitura", value: "94%", color: "hsl(var(--success))" },
+            { label: "Mensagens hoje", value: "0", color: "hsl(var(--teal))" },
+            { label: "Taxa de leitura", value: "0%", color: "hsl(var(--success))" },
             { label: "Agentes ativos", value: agents.filter(a => a.ativo).length.toString(), color: "hsl(var(--info))" },
-            { label: "Créditos restantes", value: "32/100", color: "hsl(var(--warning))" },
+            { label: "Créditos restantes", value: "0/100", color: "hsl(var(--warning))" },
           ].map((s, i) => (
             <div key={i} className="stat-card rounded-xl p-4">
               <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
