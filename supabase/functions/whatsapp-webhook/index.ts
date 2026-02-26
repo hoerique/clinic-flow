@@ -14,8 +14,8 @@ serve(async (req) => {
 
     try {
         const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+            Deno.env.get('APP_URL') ?? '',
+            Deno.env.get('APP_SERVICE_ROLE') ?? ''
         )
 
         const data = await req.json()
@@ -62,18 +62,27 @@ serve(async (req) => {
 
         console.log("✅ Message saved successfully:", insertedData)
 
-        // 5. Opcional: Chamar o orquestrador Python se estiver rodando
+        // 5. Chamar o Orquestrador de IA (Node.js na Vercel)
         const backendUrl = Deno.env.get('BACKEND_URL')
+
         if (backendUrl) {
             try {
-                await fetch(`${backendUrl}/orchestrate-webhook`, {
+                // Notifica o backend para processar a resposta do agente
+                await fetch(`${backendUrl}/ai/orchestrate-webhook`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({
+                        numero_wa: cleanNumber,
+                        corpo: text,
+                        paciente_nome: pushName
+                    })
                 })
+                console.log(`🚀 Gatilho enviado para o backend: ${backendUrl}`)
             } catch (e) {
-                console.error("⚠️ Warning calling backend:", e)
+                console.error("⚠️ Erro ao chamar orquestrador de IA:", e)
             }
+        } else {
+            console.warn("⚠️ BACKEND_URL não configurado nos Secrets do Supabase.")
         }
 
         return new Response(JSON.stringify({
