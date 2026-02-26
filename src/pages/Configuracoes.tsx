@@ -98,9 +98,12 @@ export default function Configuracoes() {
         .from('api_configs')
         .select('*')
         .eq('id', 1)
-        .single();
+        .maybeSingle(); // Better than .single() when row might not exist
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) {
+        console.error("Erro ao buscar configurações:", error);
+        return;
+      }
 
       const officialUrl = "https://yogzkpjymbbpgowvwjsh.supabase.co/functions/v1/whatsapp-webhook";
 
@@ -112,16 +115,16 @@ export default function Configuracoes() {
           anthropic: d.anthropic_key || "",
           whatsapp_instance: d.whatsapp_instance || "",
           whatsapp_url: d.whatsapp_url || "",
-          webhook_url: d.webhook_url || officialUrl, // Pre-fill if missing
+          webhook_url: d.webhook_url || officialUrl,
           webhook_secret: d.webhook_secret || "",
-          uzapi_token: d.uzapi_token || "" // Added uzapi_token
+          uzapi_token: d.uzapi_token || ""
         });
       } else {
         // Se não houver config, pré-carrega a oficial para webhook_url
         setApiKeys(prev => ({ ...prev, webhook_url: officialUrl }));
       }
     } catch (error) {
-      console.error("Erro ao buscar configurações:", error);
+      console.error("Erro inesperado ao buscar configurações:", error);
     }
   };
 
@@ -147,8 +150,10 @@ export default function Configuracoes() {
 
       const { error } = await (supabase as any)
         .from('api_configs')
-        .update(updateData)
-        .eq('id', 1);
+        .upsert({
+          id: 1,
+          ...updateData
+        });
 
       if (error) throw error;
 

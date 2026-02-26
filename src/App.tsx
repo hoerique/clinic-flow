@@ -12,6 +12,7 @@ import Automacoes from "./pages/Automacoes";
 import Usuarios from "./pages/Usuarios";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Especialistas from "./pages/Especialistas";
 import { ThemeProvider } from "./components/theme-provider";
 import NotFound from "./pages/NotFound";
 import { useNotificationObserver } from "./hooks/useNotificationObserver";
@@ -37,6 +38,7 @@ const AppContent = () => {
             <Route path="/usuarios" element={<Usuarios />} />
             <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/especialistas" element={<Especialistas />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

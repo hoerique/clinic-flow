@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/AppLayout";
 import { ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useAgendamentos, useProfissionais, usePacientes, useUpdateAgendamento } from "@/hooks/useSupabase";
+import { useAgendamentos, useProfissionais, usePacientes, useUpdateAgendamento, useDeleteAgendamento } from "@/hooks/useSupabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +41,7 @@ export default function Agenda() {
   const { data: profissionais = [], isLoading: loadingProfs } = useProfissionais();
   const { data: pacientes = [] } = usePacientes();
   const updateAgendamento = useUpdateAgendamento();
+  const deleteAgendamento = useDeleteAgendamento();
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -48,6 +49,16 @@ export default function Agenda() {
       toast.success("Status atualizado!");
     } catch (error) {
       toast.error("Erro ao atualizar status");
+    }
+  };
+
+  const handleDeleteAgendamento = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    try {
+      await deleteAgendamento.mutateAsync(id);
+      toast.success("Agendamento excluído!");
+    } catch (error) {
+      toast.error("Erro ao excluir agendamento");
     }
   };
 
@@ -171,6 +182,13 @@ export default function Agenda() {
                                     {st}
                                   </DropdownMenuItem>
                                 ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteAgendamento(apt.id)}
+                                  className="text-xs text-destructive focus:text-destructive"
+                                >
+                                  Excluir Agendamento
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           );

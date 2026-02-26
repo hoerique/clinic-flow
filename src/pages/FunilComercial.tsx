@@ -1,8 +1,9 @@
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, MoreVertical, DollarSign, Calendar, TrendingUp, User, Loader2 } from "lucide-react";
+import { Plus, MoreVertical, DollarSign, Calendar, TrendingUp, User, Loader2, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useOportunidades, usePacientes, useProfissionais, useCreateOportunidade, useUpdateOportunidade, useDeleteOportunidade } from "@/hooks/useSupabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ function ProbBar({ value }: { value: number }) {
 }
 
 export default function FunilComercial() {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newOportunidade, setNewOportunidade] = useState({
     paciente_id: "",
@@ -325,6 +327,18 @@ export default function FunilComercial() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-[hsl(var(--surface-1))] border-border">
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const phone = o.pacientes?.telefone;
+                                  if (phone) navigate(`/automacoes?chat=${phone}`);
+                                  else toast.error("Paciente sem telefone cadastrado");
+                                }}
+                                className="text-xs text-[hsl(var(--teal))] font-bold gap-2"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                Conversar no WhatsApp
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground font-bold">Mover para:</DropdownMenuLabel>
                               {etapas.map((e) => (

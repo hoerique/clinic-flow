@@ -13,6 +13,7 @@ import {
   LogOut,
   UserCog,
   BarChart3,
+  Bot
 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ const navItems = [
     section: "Automação",
     items: [
       { to: "/automacoes", label: "WhatsApp & Automações", icon: MessageSquare, badge: "Novo" },
+      { to: "/especialistas", label: "Crie seu Especialista", icon: Bot },
     ],
   },
   {
@@ -100,8 +102,8 @@ export function Sidebar() {
                   <span className="flex-1">{item.label}</span>
                   {item.badge && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${item.badge === "Novo"
-                        ? "bg-[hsl(var(--teal)/0.2)] text-[hsl(var(--teal))]"
-                        : "bg-[hsl(var(--surface-3))] text-muted-foreground"
+                      ? "bg-[hsl(var(--teal)/0.2)] text-[hsl(var(--teal))]"
+                      : "bg-[hsl(var(--surface-3))] text-muted-foreground"
                       }`}>
                       {item.badge}
                     </span>

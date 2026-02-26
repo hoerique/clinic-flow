@@ -31,4 +31,13 @@ async function start() {
     }
 }
 
-start();
+// Quando rodando localmente (Node.js normal)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    start();
+} else {
+    // Quando rodando no Vercel Serverless, conectamos ao Redis globals/preguiçosamente
+    connectRedis().catch(console.error);
+}
+
+// Exporta o app para o Vercel Serverless Function
+export default app;

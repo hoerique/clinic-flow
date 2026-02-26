@@ -8,7 +8,23 @@ export function usePacientes() {
       const { data, error } = await supabase
         .from("pacientes")
         .select("*")
+        .eq("status", "paciente") // Filter by default to patients
         .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useLeads() {
+  return useQuery({
+    queryKey: ["leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .select("*")
+        .eq("status", "lead")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -28,6 +44,25 @@ export function useCreatePaciente() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pacientes"] });
+    },
+  });
+}
+
+export function useUpdatePaciente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string;[key: string]: any }) => {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .update(updates)
+        .eq("id", id)
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pacientes"] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
   });
 }
@@ -57,6 +92,23 @@ export function useUpdateAgendamento() {
         .select();
       if (error) throw error;
       return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agendamentos"] });
+    },
+  });
+}
+
+export function useDeleteAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("agendamentos")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agendamentos"] });
@@ -197,6 +249,46 @@ export function useCreateMovimentacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["movimentacoes"] });
+    },
+  });
+}
+
+export function useMessages(numero_wa?: string) {
+  return useQuery({
+    queryKey: ["messages", numero_wa],
+    queryFn: async () => {
+      if (!numero_wa) return [];
+      const { data, error } = await (supabase as any)
+        .from("mensagens")
+        .select("*")
+        .eq("numero_wa", numero_wa)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!numero_wa,
+  });
+}
+
+export function useSendWhatsApp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ numero_wa, corpo }: { numero_wa: string; corpo: string }) => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-send', {
+        body: { numero_wa, corpo },
+      });
+
+      if (error) {
+        console.error('Erro na Edge Function whatsapp-send:', error);
+        // Tenta extrair a mensagem de erro do corpo da resposta se disponível
+        const errorMsg = (error as any).context?.message || error.message || "Erro desconhecido na função";
+        throw new Error(errorMsg);
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mensagens"] });
     },
   });
 }
