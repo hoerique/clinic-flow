@@ -1,7 +1,10 @@
 import { AppLayout } from "@/components/AppLayout";
-import { Search, Filter, Plus, MoreVertical, Phone, Mail, Tag, ChevronDown, Loader2 } from "lucide-react";
+import { Search, Filter, Plus, MoreVertical, Phone, Mail, Tag, ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { usePacientes, useCreatePaciente } from "@/hooks/useSupabase";
+import { usePacientes, useCreatePaciente, useDeletePaciente, useProfissionais, useUpdatePaciente } from "@/hooks/useSupabase";
+import { useSearchParams } from "react-router-dom";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,21 +12,23 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 const statusFunil = [
-  { key: "lead", label: "Lead", color: "hsl(var(--muted-foreground))" },
+  { key: "total", label: "Pacientes", color: "hsl(var(--teal))" },
   { key: "agendado", label: "Agendado", color: "hsl(var(--info))" },
   { key: "confirmado", label: "Confirmado", color: "hsl(var(--teal))" },
-  { key: "em_atendimento", label: "Em Atendimento", color: "hsl(var(--warning))" },
-  { key: "pos_consulta", label: "Pós-consulta", color: "hsl(var(--success))" },
-  { key: "inativo", label: "Inativo", color: "hsl(var(--destructive))" },
+  { key: "realizado", label: "Realizado", color: "hsl(var(--success))" },
+  { key: "faltou", label: "Faltou", color: "hsl(var(--destructive))" },
+  { key: "cancelado", label: "Cancelado", color: "hsl(var(--warning))" },
+  { key: "lista_espera", label: "Lista de Espera", color: "hsl(var(--warning))" },
 ];
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  lead: { label: "Lead", color: "text-muted-foreground", bg: "bg-[hsl(var(--surface-3))]" },
   agendado: { label: "Agendado", color: "text-[hsl(var(--info))]", bg: "bg-[hsl(var(--info)/0.12)]" },
   confirmado: { label: "Confirmado", color: "text-[hsl(var(--teal))]", bg: "bg-[hsl(var(--teal)/0.12)]" },
-  em_atendimento: { label: "Em Atendimento", color: "text-[hsl(var(--warning))]", bg: "bg-[hsl(var(--warning)/0.12)]" },
-  pos_consulta: { label: "Pós-consulta", color: "text-[hsl(var(--success))]", bg: "bg-[hsl(var(--success)/0.12)]" },
-  inativo: { label: "Inativo", color: "text-[hsl(var(--destructive))]", bg: "bg-[hsl(var(--destructive)/0.12)]" },
+  realizado: { label: "Realizado", color: "text-[hsl(var(--success))]", bg: "bg-[hsl(var(--success)/0.12)]" },
+  faltou: { label: "Faltou", color: "text-[hsl(var(--destructive))]", bg: "bg-[hsl(var(--destructive)/0.12)]" },
+  cancelado: { label: "Cancelado", color: "text-[hsl(var(--warning))]", bg: "bg-[hsl(var(--warning)/0.12)]" },
+  lista_espera: { label: "Lista de Espera", color: "text-[hsl(var(--warning))]", bg: "bg-[hsl(var(--warning)/0.12)]" },
+  lead: { label: "Lead", color: "text-muted-foreground", bg: "bg-[hsl(var(--surface-3))]" },
 };
 
 export default function Pacientes() {
@@ -36,12 +41,36 @@ export default function Pacientes() {
     telefone: "",
     email: "",
     convenio: "Particular",
-    status: "lead",
+    status: "agendado",
     tags: [] as string[],
+    profissional_id: "",
+    data_status: new Date().toISOString(),
+    ultima_consulta: "",
   });
 
   const { data: pacientes = [], isLoading } = usePacientes();
+  const { data: profissionais = [] } = useProfissionais();
   const createPaciente = useCreatePaciente();
+  const updatePaciente = useUpdatePaciente();
+  const deletePaciente = useDeletePaciente();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const nome = searchParams.get("nome");
+    const telefone = searchParams.get("telefone");
+    const novo = searchParams.get("novo");
+
+    if (novo === "true") {
+      setNewPaciente(prev => ({
+        ...prev,
+        nome: nome || "",
+        telefone: telefone || "",
+      }));
+      setIsDialogOpen(true);
+      // Limpa os parâmetros após processar
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   const filtered = pacientes.filter((p: any) => {
     const matchSearch = p.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -67,8 +96,11 @@ export default function Pacientes() {
           telefone: "",
           email: "",
           convenio: "Particular",
-          status: "lead",
+          status: "agendado",
           tags: [],
+          profissional_id: "",
+          data_status: new Date().toISOString(),
+          ultima_consulta: "",
         });
       }, 100);
     } catch (error: any) {
@@ -141,6 +173,20 @@ export default function Pacientes() {
                   className="bg-[hsl(var(--surface-2))] border-border text-foreground"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="profissional" className="text-muted-foreground">Profissional Responsável</Label>
+                <select
+                  id="profissional"
+                  className="w-full bg-[hsl(var(--surface-2))] border border-border rounded-md px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-[hsl(var(--teal))] focus:outline-none"
+                  value={newPaciente.profissional_id}
+                  onChange={(e) => setNewPaciente({ ...newPaciente, profissional_id: e.target.value })}
+                >
+                  <option value="">Selecione um profissional...</option>
+                  {profissionais.map((prof: any) => (
+                    <option key={prof.id} value={prof.id}>{prof.nome}</option>
+                  ))}
+                </select>
+              </div>
               <DialogFooter>
                 <Button
                   type="submit"
@@ -154,6 +200,18 @@ export default function Pacientes() {
                   )}
                 </Button>
               </DialogFooter>
+              <div className="space-y-4 pt-4 border-t border-border/50">
+                <div className="space-y-2">
+                  <Label htmlFor="ultima_consulta" className="text-muted-foreground">Última Consulta (Manual)</Label>
+                  <Input
+                    id="ultima_consulta"
+                    type="date"
+                    value={newPaciente.ultima_consulta}
+                    onChange={(e) => setNewPaciente({ ...newPaciente, ultima_consulta: e.target.value })}
+                    className="bg-[hsl(var(--surface-2))] border-border text-foreground"
+                  />
+                </div>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
@@ -161,14 +219,20 @@ export default function Pacientes() {
     >
       <div className="space-y-4 animate-fade-in">
         {/* Funil de status */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {statusFunil.map((s) => {
-            const count = pacientes.filter((p: any) => p.status === s.key).length;
+            const count = s.key === "total"
+              ? pacientes.length
+              : pacientes.filter((p: any) => p.status === s.key).length;
+
             return (
               <button
                 key={s.key}
-                onClick={() => setSelectedStatus(selectedStatus === s.key ? null : s.key)}
-                className={`stat-card rounded-xl p-3 text-left transition-all ${selectedStatus === s.key ? "ring-1 ring-[hsl(var(--teal))]" : ""}`}
+                onClick={() => setSelectedStatus(s.key === "total" ? null : (selectedStatus === s.key ? null : s.key))}
+                className={`stat-card rounded-xl p-3 text-left transition-all ${(s.key === "total" && selectedStatus === null) || selectedStatus === s.key
+                  ? "ring-1 ring-[hsl(var(--teal))]"
+                  : ""
+                  }`}
               >
                 <p className="text-lg font-bold text-foreground">{count}</p>
                 <p className="text-[11px] font-medium" style={{ color: s.color }}>{s.label}</p>
@@ -203,10 +267,9 @@ export default function Pacientes() {
                 <tr className="border-b border-border bg-[hsl(var(--surface-2)/0.5)]">
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Paciente</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden md:table-cell">Contato</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden lg:table-cell">Convênio</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden lg:table-cell">Profissional</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Status</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden xl:table-cell">Tags</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden lg:table-cell">Última Consulta</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 hidden xl:table-cell">Data e Hora</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -226,7 +289,7 @@ export default function Pacientes() {
                   </tr>
                 ) : (
                   filtered.map((p: any, i: number) => {
-                    const sc = statusConfig[p.status] || statusConfig.lead;
+                    const sc = statusConfig[p.status] || statusConfig.agendado;
                     return (
                       <tr key={p.id} className={`hover:bg-[hsl(var(--surface-2))] transition-colors cursor-pointer ${i % 2 === 0 ? "" : "bg-[hsl(var(--surface-1)/0.5)]"}`}>
                         <td className="px-4 py-3">
@@ -255,29 +318,62 @@ export default function Pacientes() {
                           </div>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
-                          <span className="text-sm text-muted-foreground">{p.convenio}</span>
+                          <span className="text-sm text-muted-foreground">{(p as any).profissionais?.nome || "—"}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`status-badge text-[10px] ${sc.color} ${sc.bg}`}>{sc.label}</span>
+                          <select
+                            className={`status-badge text-[10px] cursor-pointer appearance-none ${sc.color} ${sc.bg} border-none outline-none`}
+                            value={p.status}
+                            onChange={(e) => {
+                              updatePaciente.mutate({
+                                id: p.id,
+                                status: e.target.value,
+                                data_status: new Date().toISOString()
+                              });
+                            }}
+                          >
+                            {Object.entries(statusConfig).map(([key, config]) => (
+                              <option key={key} value={key} className="bg-[hsl(var(--surface-1))] text-foreground">{config.label}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-4 py-3 hidden xl:table-cell">
-                          <div className="flex gap-1 flex-wrap">
-                            {p.tags?.map((tag: string) => (
-                              <span key={tag} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[hsl(var(--surface-3))] text-muted-foreground">
-                                {tag}
-                              </span>
-                            )) || "—"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 hidden lg:table-cell">
-                          <span className="text-sm text-muted-foreground">
-                            {p.ultima_consulta ? new Date(p.ultima_consulta).toLocaleDateString("pt-BR") : "—"}
+                          <span className="text-xs text-muted-foreground">
+                            {p.data_status ? new Date(p.data_status).toLocaleString("pt-BR", {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : "—"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button className="p-1.5 rounded hover:bg-[hsl(var(--surface-3))] transition-colors">
-                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-1.5 rounded hover:bg-[hsl(var(--surface-3))] transition-colors">
+                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-[hsl(var(--surface-1))] border-border">
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                                onClick={async () => {
+                                  if (confirm("Deseja realmente excluir este paciente?")) {
+                                    try {
+                                      await deletePaciente.mutateAsync(p.id);
+                                      toast.success("Paciente excluído com sucesso!");
+                                    } catch (error: any) {
+                                      toast.error("Erro ao excluir: " + error.message);
+                                    }
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir Paciente
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     );

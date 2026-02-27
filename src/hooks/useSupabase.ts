@@ -7,8 +7,11 @@ export function usePacientes() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pacientes")
-        .select("*")
-        .eq("status", "paciente") // Filter by default to patients
+        .select(`
+          *,
+          profissionais (nome)
+        `)
+        .neq("status", "lead")
         .order("nome");
       if (error) throw error;
       return data;
@@ -22,7 +25,10 @@ export function useLeads() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pacientes")
-        .select("*")
+        .select(`
+          *,
+          profissionais (nome)
+        `)
         .eq("status", "lead")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -289,6 +295,23 @@ export function useSendWhatsApp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mensagens"] });
+    },
+  });
+}
+export function useDeletePaciente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("pacientes")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pacientes"] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
   });
 }

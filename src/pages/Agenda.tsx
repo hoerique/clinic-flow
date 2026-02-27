@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/AppLayout";
 import { ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useAgendamentos, useProfissionais, usePacientes, useUpdateAgendamento, useDeleteAgendamento } from "@/hooks/useSupabase";
+import { useAgendamentos, useProfissionais, usePacientes, useUpdateAgendamento, useDeleteAgendamento, useUpdatePaciente } from "@/hooks/useSupabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ const statusColor: Record<string, string> = {
   agendado: "border-[hsl(var(--info))] bg-[hsl(var(--info)/0.12)]",
   faltou: "border-[hsl(var(--destructive))] bg-[hsl(var(--destructive)/0.12)]",
   cancelado: "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)]",
+  lista_espera: "border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)]",
 };
 
 const statusText: Record<string, string> = {
@@ -31,6 +32,7 @@ const statusText: Record<string, string> = {
   agendado: "text-[hsl(var(--info))]",
   faltou: "text-[hsl(var(--destructive))]",
   cancelado: "text-[hsl(var(--warning))]",
+  lista_espera: "text-[hsl(var(--warning))]",
 };
 
 export default function Agenda() {
@@ -42,10 +44,21 @@ export default function Agenda() {
   const { data: pacientes = [] } = usePacientes();
   const updateAgendamento = useUpdateAgendamento();
   const deleteAgendamento = useDeleteAgendamento();
+  const updatePaciente = useUpdatePaciente();
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       await updateAgendamento.mutateAsync({ id, status: newStatus });
+
+      // Sincronizar com o paciente
+      const agendamento = agendamentos.find((a: any) => a.id === id);
+      if (agendamento && agendamento.paciente_id) {
+        await updatePaciente.mutateAsync({
+          id: agendamento.paciente_id,
+          status: newStatus
+        });
+      }
+
       toast.success("Status atualizado!");
     } catch (error) {
       toast.error("Erro ao atualizar status");
@@ -138,7 +151,7 @@ export default function Agenda() {
               {(selectedProf ? profissionais.filter((p: any) => p.id === selectedProf) : profissionais).map((prof: any) => {
                 const profApts = agendamentosFiltrados.filter((a: any) => a.profissional_id === prof.id);
                 return (
-                  <div key={prof.id} className="flex-1 min-w-[200px] border-r border-border last:border-r-0">
+                  <div key={prof.id} className="flex-1 min-w-[110px] border-r border-border last:border-r-0">
                     <div className="h-12 border-b border-border flex items-center justify-center gap-2 px-3 sticky top-0 bg-[hsl(var(--surface-1))] z-10">
                       <div className="w-2 h-2 rounded-full" style={{ background: prof.cor }} />
                       <span className="text-xs font-semibold text-foreground truncate">{prof.nome}</span>
@@ -207,13 +220,14 @@ export default function Agenda() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: "Agendado", count: agendamentos.filter((a: any) => a.status === 'agendado' || !a.status).length, color: "hsl(var(--info))" },
             { label: "Confirmado", count: agendamentos.filter((a: any) => a.status === 'confirmado').length, color: "hsl(var(--teal))" },
             { label: "Realizado", count: agendamentos.filter((a: any) => a.status === 'realizado').length, color: "hsl(var(--success))" },
             { label: "Faltou", count: agendamentos.filter((a: any) => a.status === 'faltou').length, color: "hsl(var(--destructive))" },
-            { label: "Lista de Espera", count: 0, color: "hsl(var(--warning))" },
+            { label: "Cancelado", count: agendamentos.filter((a: any) => a.status === 'cancelado').length, color: "hsl(var(--warning))" },
+            { label: "Lista de Espera", count: agendamentos.filter((a: any) => a.status === 'lista_espera').length, color: "hsl(var(--warning))" },
           ].map((s) => (
             <div key={s.label} className="stat-card rounded-xl p-3 text-center border border-border">
               <p className="text-xl font-bold" style={{ color: s.color }}>{s.count}</p>

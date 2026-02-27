@@ -1,5 +1,5 @@
 import { Plus, Loader2 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCreateAgendamento } from "@/hooks/useSupabase";
 import {
     Dialog,
@@ -43,6 +43,19 @@ export function CreateAgendamentoModal({ pacientes, profissionais }: CreateAgend
     // Memoize lists to ensure stable reference during re-renders
     const memoizedPacientes = useMemo(() => pacientes, [pacientes]);
     const memoizedProfissionais = useMemo(() => profissionais, [profissionais]);
+
+    // Regra de Negócio: Sugerir profissional vinculado ao paciente
+    useEffect(() => {
+        if (newAgendamento.paciente_id) {
+            const paciente = memoizedPacientes.find(p => p.id.toString() === newAgendamento.paciente_id);
+            if (paciente?.profissional_id) {
+                setNewAgendamento(prev => ({
+                    ...prev,
+                    profissional_id: paciente.profissional_id.toString()
+                }));
+            }
+        }
+    }, [newAgendamento.paciente_id, memoizedPacientes]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();

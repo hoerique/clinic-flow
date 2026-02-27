@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/AppLayout";
-import { MessageSquare, Plus, Play, Pause, Cpu, Settings2, Trash2, Users, Tag, CheckCircle2, Search, Send, User, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Play, Pause, Cpu, Settings2, Trash2, Users, Tag, CheckCircle2, Search, Send, User, Loader2, Copy } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AgentModal } from "@/components/AgentModal";
@@ -413,92 +413,148 @@ export default function Automacoes() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-[hsl(var(--surface-2))/0.5]">
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Nome do Lead</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">WhatsApp</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Tags / Interesse</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50">Nome do Lead</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50">WhatsApp</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 whitespace-nowrap">Tags / Interesse</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {leads
-                    .filter(l => l.nome.toLowerCase().includes(searchTerm.toLowerCase()) || l.telefone.includes(searchTerm))
-                    .map((lead) => (
-                      <tr key={lead.id} className="hover:bg-[hsl(var(--surface-2))] transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[hsl(var(--teal)/0.1)] flex items-center justify-center text-[hsl(var(--teal))] font-bold text-xs">
-                              {lead.nome.substring(0, 2).toUpperCase()}
+                  {contacts
+                    .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.number.includes(searchTerm))
+                    .map((contact) => {
+                      const leadId = leads.find(l => l.telefone === contact.number)?.id;
+                      const leadData = leads.find(l => l.telefone === contact.number);
+
+                      return (
+                        <tr key={contact.number} className="hover:bg-[hsl(var(--surface-2))] transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[hsl(var(--teal)/0.1)] flex items-center justify-center text-[hsl(var(--teal))] font-bold text-xs flex-shrink-0">
+                                {contact.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <span className="text-sm font-semibold text-foreground truncate max-w-[150px]">{contact.name}</span>
                             </div>
-                            <span className="text-sm font-semibold text-foreground">{lead.nome}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-muted-foreground font-mono">{lead.telefone}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                            {(lead.tags || []).map((tag: string) => (
-                              <Badge
-                                key={tag}
-                                variant="secondary"
-                                className="text-[10px] group-hover:bg-[hsl(var(--teal)/0.2)] group-hover:text-[hsl(var(--teal))] border-none cursor-default"
+                          </td>
+                          <td className="px-6 py-4 border-r border-border/50">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground font-mono">{contact.number}</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(contact.number);
+                                  toast.success("Número copiado!");
+                                }}
+                                className="p-1 rounded hover:bg-[hsl(var(--surface-3))] text-muted-foreground transition-colors group-hover:block hidden"
+                                title="Copiar número"
                               >
-                                {tag.toUpperCase()}
-                                <button
-                                  onClick={() => {
-                                    const newTags = lead.tags.filter((t: string) => t !== tag);
-                                    updatePaciente.mutate({ id: lead.id, tags: newTags });
-                                  }}
-                                  className="ml-1.5 hover:text-red-500 transition-colors"
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1.5 min-h-[32px] max-w-[200px]">
+                              {contact.tags.map((tag: string) => (
+                                <Badge
+                                  key={tag}
+                                  variant="secondary"
+                                  className="text-[10px] group-hover:bg-[hsl(var(--teal)/0.2)] group-hover:text-[hsl(var(--teal))] border-none cursor-default"
                                 >
-                                  &times;
-                                </button>
-                              </Badge>
-                            ))}
-                            <input
-                              placeholder="Add tag..."
-                              className="bg-transparent border-none outline-none text-[10px] text-muted-foreground italic w-16"
-                              value={tagInput[lead.id] || ""}
-                              onChange={(e) => setTagInput({ ...tagInput, [lead.id]: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && tagInput[lead.id]?.trim()) {
-                                  const newTags = Array.from(new Set([...(lead.tags || []), tagInput[lead.id].trim()]));
-                                  updatePaciente.mutate({ id: lead.id, tags: newTags });
-                                  setTagInput({ ...tagInput, [lead.id]: "" });
-                                }
-                              }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-[10px] font-bold gap-1.5 hover:bg-[hsl(var(--teal)/0.1)] hover:text-[hsl(var(--teal))] border-border"
-                              onClick={() => {
-                                setSelectedContact(lead.telefone);
-                                setActiveTab("chat");
-                              }}
-                            >
-                              <MessageSquare className="w-3 h-3" /> VER CHAT
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-[10px] font-bold gap-1.5 hover:bg-[hsl(var(--success)/0.1)] hover:text-[hsl(var(--success))] border-border"
-                              onClick={() => updatePaciente.mutate({ id: lead.id, status: 'paciente' })}
-                            >
-                              <CheckCircle2 className="w-3 h-3" /> CONVERTER
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                                  {tag.toUpperCase()}
+                                  {leadId && (
+                                    <button
+                                      onClick={() => {
+                                        const newTags = contact.tags.filter((t: string) => t !== tag);
+                                        updatePaciente.mutate({ id: leadId, tags: newTags });
+                                      }}
+                                      className="ml-1.5 hover:text-red-500 transition-colors"
+                                    >
+                                      &times;
+                                    </button>
+                                  )}
+                                </Badge>
+                              ))}
+                              {leadId && (
+                                <input
+                                  placeholder="+"
+                                  className="bg-transparent border-none outline-none text-[10px] text-muted-foreground font-bold w-6"
+                                  value={tagInput[leadId] || ""}
+                                  onChange={(e) => setTagInput({ ...tagInput, [leadId]: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && tagInput[leadId]?.trim()) {
+                                      const newTags = Array.from(new Set([...(contact.tags || []), tagInput[leadId].trim()]));
+                                      updatePaciente.mutate({ id: leadId, tags: newTags });
+                                      setTagInput({ ...tagInput, [leadId]: "" });
+                                    }
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-[10px] font-bold gap-1.5 hover:bg-[hsl(var(--teal)/0.1)] hover:text-[hsl(var(--teal))] border-border"
+                                onClick={() => {
+                                  setSelectedContact(contact.number);
+                                  setActiveTab("chat");
+                                }}
+                              >
+                                <MessageSquare className="w-3 h-3" /> VER CHAT
+                              </Button>
+                              {!contact.isLead ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-[10px] font-bold gap-1.5 hover:bg-[hsl(var(--warning)/0.1)] hover:text-[hsl(var(--warning))] border-border"
+                                  onClick={async () => {
+                                    try {
+                                      // Primero capturar como lead se desejar registrar na base, 
+                                      // ou apenas redirecionar com os dados
+                                      const { data, error } = await supabase
+                                        .from('pacientes')
+                                        .insert({
+                                          nome: contact.name,
+                                          telefone: contact.number,
+                                          status: 'lead'
+                                        })
+                                        .select()
+                                        .single();
+
+                                      if (error) throw error;
+                                      queryClient.invalidateQueries({ queryKey: ["leads"] });
+
+                                      // Redirecionar para pacientes com os dados para preencher o agendamento
+                                      window.location.href = `/pacientes?nome=${encodeURIComponent(contact.name)}&telefone=${encodeURIComponent(contact.number)}&novo=true`;
+                                    } catch (err: any) {
+                                      toast.error("Erro ao processar: " + err.message);
+                                    }
+                                  }}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" /> AGENDADO
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-[10px] font-bold gap-1.5 hover:bg-[hsl(var(--success)/0.1)] hover:text-[hsl(var(--success))] border-border"
+                                  onClick={() => {
+                                    window.location.href = `/pacientes?nome=${encodeURIComponent(contact.name)}&telefone=${encodeURIComponent(contact.number)}&novo=true`;
+                                  }}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" /> AGENDADO
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
-              {leads.length === 0 && (
-                <div className="p-20 text-center text-muted-foreground italic">Nenhum lead registrado no momento</div>
+              {contacts.length === 0 && (
+                <div className="p-20 text-center text-muted-foreground italic">Nenhum contato capturado no momento</div>
               )}
             </div>
           </div>
