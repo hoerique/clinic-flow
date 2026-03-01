@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Cpu, Save, Plus, Trash2, Bot, Settings2, ShieldCheck, Zap } from "lucide-react";
+import { Cpu, Save, Plus, Trash2, Bot, Settings2, ShieldCheck, Zap, Calendar, UserPlus, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -94,7 +95,25 @@ export function AgentModal({ isOpen, onClose, onSuccess, agent }: AgentModalProp
         model: agent?.model || "gpt-4o",
     });
 
-    const [tools, setTools] = useState<Tool[]>(agent?.tools || []);
+    const [permissions, setPermissions] = useState({
+        agendamento: false,
+        cadastro: false
+    });
+
+    // Mapeamento de ferramentas para cada permissão
+    const PERMISSION_TOOLS = {
+        agendamento: [
+            { name: "get_current_date", description: "Retorna a data e hora atual do sistema." },
+            { name: "search_patient", description: "Busca um paciente pelo nome ou telefone." },
+            { name: "list_professionals", description: "Lista os médicos disponíveis." },
+            { name: "list_appointments", description: "Consulta a agenda de um médico." },
+            { name: "create_appointment", description: "Cria um novo agendamento." }
+        ],
+        cadastro: [
+            { name: "search_patient", description: "Busca um paciente pelo nome ou telefone." },
+            { name: "create_patient", description: "Cadastra um novo paciente no CRM." }
+        ]
+    };
 
     // Sincroniza o estado interno quando o agente muda (ex: ao clicar em editar)
     useEffect(() => {
@@ -109,7 +128,14 @@ export function AgentModal({ isOpen, onClose, onSuccess, agent }: AgentModalProp
                 provider: agent?.provider || "openai",
                 model: agent?.model || "gpt-4o",
             });
-            setTools(agent?.tools || []);
+
+            const initialTools = agent?.tools || [];
+
+            // Verifica quais permissões estão ativas baseando-se nas tools existentes
+            setPermissions({
+                agendamento: initialTools.some((t: Tool) => t.name === "create_appointment"),
+                cadastro: initialTools.some((t: Tool) => t.name === "create_patient")
+            });
         }
     }, [agent, isOpen]);
 
@@ -131,9 +157,31 @@ export function AgentModal({ isOpen, onClose, onSuccess, agent }: AgentModalProp
 
         setLoading(true);
         try {
+            // Constrói a lista de tools baseada nas permissões selecionadas
+            const finalTools: Tool[] = [];
+            const toolNames = new Set<string>();
+
+            if (permissions.agendamento) {
+                PERMISSION_TOOLS.agendamento.forEach(t => {
+                    if (!toolNames.has(t.name)) {
+                        finalTools.push(t);
+                        toolNames.add(t.name);
+                    }
+                });
+            }
+
+            if (permissions.cadastro) {
+                PERMISSION_TOOLS.cadastro.forEach(t => {
+                    if (!toolNames.has(t.name)) {
+                        finalTools.push(t);
+                        toolNames.add(t.name);
+                    }
+                });
+            }
+
             const dataToSave = {
                 ...formData,
-                tools,
+                tools: finalTools,
                 updated_at: new Date().toISOString(),
             };
 
@@ -159,19 +207,6 @@ export function AgentModal({ isOpen, onClose, onSuccess, agent }: AgentModalProp
         }
     };
 
-    const addTool = () => {
-        setTools([...tools, { name: "", description: "" }]);
-    };
-
-    const removeTool = (index: number) => {
-        setTools(tools.filter((_, i) => i !== index));
-    };
-
-    const updateTool = (index: number, field: keyof Tool, value: string) => {
-        const newTools = [...tools];
-        newTools[index][field] = value;
-        setTools(newTools);
-    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -306,53 +341,72 @@ export function AgentModal({ isOpen, onClose, onSuccess, agent }: AgentModalProp
                         </div>
                     </div>
 
-                    {/* Seção 4: Ferramentas (Tools) */}
+                    {/* Seção 4: Permissões de Ação */}
                     <div className="space-y-4 pt-4 border-t border-border">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2 uppercase tracking-wider">
-                                <Settings2 className="w-4 h-4" />
-                                Ferramenta de Ação (Tools)
+                                <ShieldCheck className="w-4 h-4" />
+                                Permissões e Ações de Clínica
                             </h3>
-                            <Button type="button" variant="outline" size="sm" onClick={addTool} className="gap-2 border-dashed">
-                                <Plus className="w-4 h-4" />
-                                Adicionar Tool
-                            </Button>
                         </div>
 
-                        {tools.length === 0 && (
-                            <div className="text-center py-6 bg-[hsl(var(--surface-2))] rounded-lg border border-dashed border-border">
-                                <p className="text-xs text-muted-foreground uppercase font-semibold">Nenhuma ferramenta de ação configurada</p>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 gap-3">
-                            {tools.map((tool, index) => (
-                                <div key={index} className="flex gap-2 items-start bg-[hsl(var(--surface-2))] p-4 rounded-xl border border-border shadow-sm">
-                                    <div className="flex-1 space-y-3">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Nome da Função</Label>
-                                            <Input
-                                                placeholder="Ex: get_appointment_slots"
-                                                value={tool.name}
-                                                onChange={(e) => updateTool(index, "name", e.target.value)}
-                                                className="bg-background h-8 text-sm font-mono"
-                                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Card Agendamento */}
+                            <div className={`p-4 rounded-2xl border transition-all duration-300 ${permissions.agendamento ? 'border-[hsl(var(--teal))] bg-[hsl(var(--teal)/0.03)] shadow-sm' : 'border-border bg-[hsl(var(--surface-2))]'}`}>
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${permissions.agendamento ? 'bg-[hsl(var(--teal))] text-white' : 'bg-muted text-muted-foreground'}`}>
+                                            <Calendar className="w-5 h-5" />
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Descrição (Para a IA)</Label>
-                                            <Input
-                                                placeholder="Ex: Busca horários livres para uma data específica"
-                                                value={tool.description}
-                                                onChange={(e) => updateTool(index, "description", e.target.value)}
-                                                className="bg-background h-8 text-sm"
-                                            />
+                                        <div>
+                                            <h4 className="font-bold text-sm">Agendamento</h4>
+                                            <p className="text-[10px] text-muted-foreground">Consultar agenda e marcar consultas</p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => removeTool(index)} className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-1">
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    <Switch
+                                        checked={permissions.agendamento}
+                                        onCheckedChange={(checked) => setPermissions(prev => ({ ...prev, agendamento: checked }))}
+                                    />
                                 </div>
-                            ))}
+                                {permissions.agendamento && (
+                                    <div className="flex items-center gap-1.5 mt-3 animate-in fade-in slide-in-from-top-1">
+                                        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--teal))]" />
+                                        <span className="text-[10px] font-medium text-[hsl(var(--teal))] uppercase">Permissão Ativa</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Card Cadastro */}
+                            <div className={`p-4 rounded-2xl border transition-all duration-300 ${permissions.cadastro ? 'border-[hsl(var(--teal))] bg-[hsl(var(--teal)/0.03)] shadow-sm' : 'border-border bg-[hsl(var(--surface-2))]'}`}>
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${permissions.cadastro ? 'bg-[hsl(var(--teal))] text-white' : 'bg-muted text-muted-foreground'}`}>
+                                            <UserPlus className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-sm">Cadastro</h4>
+                                            <p className="text-[10px] text-muted-foreground">Registrar novos pacientes e leads</p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={permissions.cadastro}
+                                        onCheckedChange={(checked) => setPermissions(prev => ({ ...prev, cadastro: checked }))}
+                                    />
+                                </div>
+                                {permissions.cadastro && (
+                                    <div className="flex items-center gap-1.5 mt-3 animate-in fade-in slide-in-from-top-1">
+                                        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--teal))]" />
+                                        <span className="text-[10px] font-medium text-[hsl(var(--teal))] uppercase">Permissão Ativa</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-[hsl(var(--surface-3))] rounded-xl border border-dashed border-border mt-4">
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-2 italic">
+                                <Settings2 className="w-3 h-3" />
+                                As ferramentas técnicas (LangChain Tools) serão configuradas automaticamente com base nas permissões acima.
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -172,7 +172,7 @@ export default function Dashboard() {
   return (
     <AppLayout
       title="Dashboard"
-      subtitle={`Visão geral — ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
+      subtitle={<span>{`Visão geral — ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}</span>}
     >
       <div className="space-y-6 animate-fade-in">
         {/* KPI Grid */}

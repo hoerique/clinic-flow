@@ -316,8 +316,8 @@ export default function FunilComercial() {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{o.pacientes?.nome || "Paciente"}</p>
-                            <p className="text-xs text-muted-foreground truncate">{o.procedimento}</p>
+                            <p className="text-sm font-semibold text-foreground truncate"><span>{o.pacientes?.nome || "Paciente"}</span></p>
+                            <p className="text-xs text-muted-foreground truncate"><span>{o.procedimento}</span></p>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -370,7 +370,7 @@ export default function FunilComercial() {
                           </span>
                           <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
                             <Calendar className="w-3 h-3" />
-                            {o.data_previsao ? new Date(o.data_previsao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : "--/--"}
+                            <span>{o.data_previsao ? new Date(o.data_previsao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : "--/--"}</span>
                           </div>
                         </div>
 

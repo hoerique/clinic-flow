@@ -5,20 +5,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install bun for faster installs (optional, or use npm)
-RUN npm install -g bun
-
 # Copy dependency files
-COPY package.json bun.lockb ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN npm install
 
 # Copy source code
 COPY . .
 
 # Build for production
-RUN bun run build
+RUN npm run build
 
 # ─────────────────────────────────────────────
 # Stage 2: Serve with NGINX
